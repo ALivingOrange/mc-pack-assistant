@@ -4,6 +4,9 @@ server/
 # JRE files
 jre/
 
+# Conda environment
+conda-env/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

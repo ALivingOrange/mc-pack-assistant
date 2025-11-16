@@ -1,5 +1,5 @@
 # Conda environment setup
-$condaEnvName = "mc-agent-env"
+$condaEnvPath = Join-Path $PSScriptRoot "conda-env"
 
 # Check if conda is installed
 try {
@@ -10,11 +10,9 @@ try {
 }
 
 # Check if environment exists
-$envExists = conda env list | Select-String -Pattern $condaEnvName -Quiet
-
-if (-not $envExists) {
+if (-not (Test-Path $condaEnvPath)) {
     Write-Host "Creating conda environment..."
-    conda create -n $condaEnvName python=3.11 -y
+    conda create -p $condaEnvPath python=3.11 -y
     
     Write-Host "Installing required packages..."
     
@@ -32,7 +30,7 @@ if (-not $envExists) {
 	"google-genai"
         "google-adk"
     ) 
-    conda run -n $condaEnvName pip install $pipPackages
+    conda run -p $condaEnvPath pip install $pipPackages
 }
 
 
