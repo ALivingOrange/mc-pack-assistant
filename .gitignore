@@ -1,3 +1,10 @@
+# Server files
+server/
+
+# JRE files
+jre/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
