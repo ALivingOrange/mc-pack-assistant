@@ -1,3 +1,41 @@
+# Conda environment setup
+$condaEnvName = "mc-agent-env"
+
+# Check if conda is installed
+try {
+    $null = Get-Command conda -ErrorAction Stop
+} catch {
+    Write-Host "Conda not found. Please install Miniconda from https://docs.conda.io/en/latest/miniconda.html"
+    exit
+}
+
+# Check if environment exists
+$envExists = conda env list | Select-String -Pattern $condaEnvName -Quiet
+
+if (-not $envExists) {
+    Write-Host "Creating conda environment..."
+    conda create -n $condaEnvName python=3.11 -y
+    
+    Write-Host "Installing required packages..."
+    
+<# NO CONDA YET
+    # Install conda packages
+    $condaPackages = @(
+    )    
+    foreach ($package in $condaPackages) {
+        conda install -n $condaEnvName $package -y
+    }
+#>
+
+    # Install pip packages
+    $pipPackages = @(
+	"google-genai"
+        "google-adk"
+    ) 
+    conda run -n $condaEnvName pip install $pipPackages
+}
+
+
 # Install JRE if not present
 if (-not (Test-Path "jre")) {
     Write-Host "Installing JRE..."
@@ -44,3 +82,4 @@ eula=true
         Write-Host "EULA not accepted. Exiting."
     }
 }
+
