@@ -73,8 +73,56 @@ if (Test-Path "eula.txt") {
 #$timestamp
 eula=true
 "@ | Set-Content "eula.txt"
-        
-        Write-Host "EULA accepted. Restarting server..."
+    Write-Host "EULA accepted. Installing KubeJS and restarting server..."
+
+# Install Required Mods (through Modrinth API)
+    Set-location mods
+    $mods = @(
+        @{
+            ProjectId = "lhGA9TYQ"  # architectury-api
+            VersionId = "9.2.14+fabric"
+            OutFile = "architectury-9.2.14-fabric.jar"
+        },
+        @{
+            ProjectId = "sk9knFPE"  # rhino
+            VersionId = "2001.2.3-build.10+fabric"
+            OutFile = "rhino-fabric-2001.2.3-build.10.jar"
+        },
+        @{
+            ProjectId = "umyGl7zF"  # kubejs
+            VersionId = "2001.6.5-build.16+fabric"
+            OutFile = "kubejs-fabric-2001.6.5-build.16.jar"
+        },
+        @{
+            ProjectId = "P7dR8mSH"  # fabric-api
+            VersionId = "0.92.6+1.20.1"
+            OutFile = "fabric-api-0.92.6+1.20.1.jar"
+        }
+    )
+
+    foreach ($mod in $mods) {
+        if (Test-Path $mod.OutFile) {
+            Write-Host "File already exists: $($mod.OutFile) - Skipping download" -ForegroundColor Yellow
+        } else {
+            Write-Host "Fetching download URL for: $($mod.OutFile)" -ForegroundColor Cyan
+            
+            # Get version info from Modrinth API
+            $apiUrl = "https://api.modrinth.com/v2/project/$($mod.ProjectId)/version"
+            $versions = Invoke-RestMethod -Uri $apiUrl
+            
+            # Find the matching version
+            $version = $versions | Where-Object { $_.version_number -eq $mod.VersionId }
+            
+            if ($version -and $version.files.Count -gt 0) {
+                $downloadUrl = $version.files[0].url
+                Write-Host "Downloading: $($mod.OutFile)" -ForegroundColor Green
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $mod.OutFile
+            } else {
+                Write-Host "Could not find version $($mod.VersionId) for this mod" -ForegroundColor Red
+            }
+        }
+    }
+	Set-Location ..
         & $jreExe -Xmx2G -jar $jarFile -nogui
     } else {
         Write-Host "EULA not accepted. Exiting."
