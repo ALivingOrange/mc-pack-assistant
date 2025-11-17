@@ -338,6 +338,57 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
     return {"status": "success"}
 
+def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int, output_path: str) -> dict:
+    """Writes to a KubeJS script to create a stonecutting recipe with the given items.
+
+    Args:
+        comment: A string describing the recipe in natural language. Will be added
+        to the script as a comment. Try to describe what mod each item is from.
+        Ex: "Cut planks into sticks on the stonecutter."
+
+        ingredient: Item identifier or tag of the input item as a string.
+        Tags should be prefixed with '#'. Ex: "#minecraft:planks" or "minecraft:stone"
+
+        result: Item identifier of result as a string.
+        Ex: "minecraft:stick"
+
+        count: Amount of result produced. Ex: 3
+
+        output_path: The file path for the script to be written in.
+    """
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+    # TO-DO: Validate Item IDs
+
+    # Format result with count
+    if count > 1:
+        result_str = f"'{count}x {result}'"
+    else:
+        result_str = f"'{result}'"
+
+    # Add script to lines
+    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"event.stonecutting({result_str}, '{ingredient}')\n")
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
 # ====== VALIDATOR HELPER FUNCTIONS ===========================================
 
 def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
@@ -419,7 +470,7 @@ recipe_modifier_agent = LlmAgent(
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
-    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe, add_cooking_recipe],
+    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe, add_cooking_recipe, add_stonecutting_recipe],
     )
 
 
