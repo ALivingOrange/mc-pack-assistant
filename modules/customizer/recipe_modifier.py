@@ -65,11 +65,21 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
     lines.append(f"\tItem.of('{result}', {count}),\n")
     lines.append("\t[\n")
     for key in ingredients:
-        # Only specify count if >1
-        if ingredients[key] == 1:
-            lines.append(f"\t\t'{key}',\n")
+        # Check if there are multiple ingredient options
+        if '|' in key:
+            ingredient_options = key.split('|')
+            formatted_options = ', '.join(f"'{opt}'" for opt in ingredient_options)
+            # Only specify count if >1
+            if ingredients[key] == 1:
+                lines.append(f"\t\t[{formatted_options}],\n")
+            else:
+                lines.append(f"\t\t'{ingredients[key]}x [{formatted_options}]',\n")
         else:
-            lines.append(f"\t\t'{ingredients[key]}x {key}',\n")
+            # Only specify count if >1
+            if ingredients[key] == 1:
+                lines.append(f"\t\t'{key}',\n")
+            else:
+                lines.append(f"\t\t'{ingredients[key]}x {key}',\n")
     # Remove comment from last ingredient
     lines[-1] = lines[-1][:-2] + "\n"
     
