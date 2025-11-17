@@ -48,7 +48,9 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
         output_path: The file path for the script to be written in.
     """
- # Read output file
+# TO-DO: Validate Item IDs
+
+# Read output file
     try:
         with open(output_path, 'r') as file:
             lines:list[str] = file.readlines()
@@ -57,7 +59,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 # Remove last line (should be closing "})")        
     if lines: lines = lines[:-1]
 
-# TO-DO: Validate Item IDs
+
 
 # Add script to lines
     lines.append(f"\n\n# {comment}\n")
@@ -96,6 +98,160 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
     return {"status": "success"}
 
+def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result: str, count: int, output_path: str) -> dict:
+    """Writes to a KubeJS script to create a shaped recipe with the given items.
+
+    Args:
+        comment: A string describing the recipe in natural language. Will be added
+        to the script as a comment. Try to describe what mod each item is from.
+        Ex: "Craft a chest from vanilla using 8 planks in a square shape."
+
+        shape: A list of strings representing the crafting grid pattern. Must be 1-3
+        strings, each 1-3 characters long. Use letters A-I to represent ingredients
+        and spaces for empty slots. Letters correspond to ingredients dict order
+        (first ingredient = A, second = B, etc.).
+        Ex: ["AAA", "A A", "AAA"] for a chest pattern
+
+        ingredients: A dict containing the items in the recipe. Keys should be item
+        identifiers, while values should be the letter (A-I) they represent in the
+        shape pattern. The order matters: first item is A, second is B, etc.
+        For cases with multiple ingredient options, separate each with '|' characters.
+        Ex: {"minecraft:oak_planks|minecraft:birch_planks": "A"}
+
+        result: Item identifier of result as a string
+        Ex: "minecraft:chest"
+
+        count: Amount of result produced. Ex: 1
+
+        output_path: The file path for the script to be written in.
+    """
+    # TO-DO: Validate Item IDs
+
+    validation = validate_shaped_recipe(shape, ingredients)
+    if not validation["valid"]:
+        return {"status": "error", "error_message": validation["error_message"]}
+
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+
+    # Add script to lines
+    lines.append(f"\n\n# {comment}\n")
+    lines.append("event.shaped(\n")
+    lines.append(f"\tItem.of('{result}', {count}),\n")
+    lines.append("\t[\n")
+    
+    # Add shape pattern
+    for row in shape:
+        lines.append(f"\t\t'{row}',\n")
+    # Remove comma from last row
+    lines[-1] = lines[-1][:-2] + "\n"
+    
+    lines.append("\t],\n")
+    lines.append("\t{\n")
+    
+    # Add ingredient mappings
+    for key, letter in ingredients.items():
+        # Check if there are multiple ingredient options
+        if '|' in key:
+            ingredient_options = key.split('|')
+            formatted_options = ', '.join(f"'{opt}'" for opt in ingredient_options)
+            lines.append(f"\t\t{letter}: [{formatted_options}],\n")
+        else:
+            lines.append(f"\t\t{letter}: '{key}',\n")
+    
+    # Remove comma from last ingredient
+    lines[-1] = lines[-1][:-2] + "\n"
+    
+    lines.append("\t}\n")
+    lines.append(")\n")
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
+# ====== VALIDATOR HELPER FUNCTIONS ===========================================
+
+def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
+    """Validates the shape and ingredients for a shaped recipe.
+    
+    Args:
+        shape: A list of strings representing the crafting grid pattern.
+        ingredients: A dict mapping item identifiers to letters (A-I).
+    
+    Returns:
+        A dict with 'valid' (bool) and 'error_message' (str) if invalid.
+    """
+    # Validate shape is a list
+    if not isinstance(shape, list):
+        return {"valid": False, "error_message": "Shape must be a list of strings"}
+    
+    # Validate shape has 1-3 rows
+    if len(shape) < 1 or len(shape) > 3:
+        return {"valid": False, "error_message": "Shape must have 1-3 rows"}
+    
+    # Validate each row
+    for i, row in enumerate(shape):
+        if not isinstance(row, str):
+            return {"valid": False, "error_message": f"Row {i} must be a string"}
+        
+        if len(row) < 1 or len(row) > 3:
+            return {"valid": False, "error_message": f"Row {i} must be 1-3 characters long"}
+        
+        # Check that row only contains A-I and spaces
+        for char in row:
+            if char not in 'ABCDEFGHI ':
+                return {"valid": False, "error_message": f"Row {i} contains invalid character '{char}'. Only A-I and spaces are allowed"}
+    
+    # Collect all letters used in shape
+    letters_in_shape = set()
+    for row in shape:
+        for char in row:
+            if char != ' ':
+                letters_in_shape.add(char)
+    
+    # Validate ingredients is a dict
+    if not isinstance(ingredients, dict):
+        return {"valid": False, "error_message": "Ingredients must be a dictionary"}
+    
+    # Collect all letters in ingredients
+    letters_in_ingredients = set(ingredients.values())
+    
+    # Validate that all letters in ingredients are A-I
+    for letter in letters_in_ingredients:
+        if not isinstance(letter, str) or len(letter) != 1 or letter not in 'ABCDEFGHI':
+            return {"valid": False, "error_message": f"Invalid ingredient letter '{letter}'. Must be A-I"}
+    
+    # Check for duplicate letters in ingredients
+    if len(letters_in_ingredients) != len(ingredients):
+        return {"valid": False, "error_message": "Duplicate letters found in ingredients. Each ingredient must map to a unique letter"}
+    
+    # Validate that all letters in shape have corresponding ingredients
+    missing_ingredients = letters_in_shape - letters_in_ingredients
+    if missing_ingredients:
+        return {"valid": False, "error_message": f"Letters {missing_ingredients} used in shape but not defined in ingredients"}
+    
+    # Warn if there are unused ingredients (technically creates valid syntax but probably bad hygiene to let the agent get away with it)
+    unused_ingredients = letters_in_ingredients - letters_in_shape
+    if unused_ingredients:
+        return {"valid": False, "error_message": f"Letters {unused_ingredients} defined in ingredients but not used in shape"}
+    
+    return {"valid": True}
+
 # ====== RECIPE MODIFIER AGENT ================================================
 recipe_modifier_agent = LlmAgent(
     name="recipe_modifier_agent",
@@ -106,11 +262,11 @@ recipe_modifier_agent = LlmAgent(
     When given a request, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
     The output path should just be "test.txt" for now.
-    For the moment, your only available tool is `add_shapeless_recipe()`. You will get more soon.
+    For the moment, you are only able to add shapeless and shaped recipes.
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
-    tools=[add_shapeless_recipe],
+    tools=[add_shapeless_recipe, add_shaped_recipe],
     )
 
 
