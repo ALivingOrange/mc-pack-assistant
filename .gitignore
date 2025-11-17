@@ -10,7 +10,10 @@ jre/
 # Conda environment
 conda-env/
 
+# Test file for recipe modifier
+modules/customizer/test.txt
 
+# =v=v=v=v= Default Python Gitignore =v=v=v=v=
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
