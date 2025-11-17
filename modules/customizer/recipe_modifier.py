@@ -184,6 +184,63 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
 
     return {"status": "success"}
 
+def add_smithing_recipe(comment: str, template: str, base: str, addition: str, result: str, output_path: str) -> dict:
+    """Writes to a KubeJS script to create a smithing recipe with the given items.
+
+    Args:
+        comment: A string describing the recipe in natural language. Will be added
+        to the script as a comment. Try to describe what mod each item is from.
+        Ex: "Upgrade iron ingot with black dye using netherite upgrade template to make netherite ingot."
+
+        template: Item identifier of the smithing template as a string.
+        Ex: "minecraft:netherite_upgrade_smithing_template"
+
+        base: Item identifier of the base item to be upgraded as a string.
+        Ex: "minecraft:iron_ingot"
+
+        addition: Item identifier of the addition/upgrade item as a string.
+        Ex: "minecraft:black_dye"
+
+        result: Item identifier of result as a string.
+        Ex: "minecraft:netherite_ingot"
+
+        output_path: The file path for the script to be written in.
+    """
+
+    # TO-DO: Validate Item IDs
+    
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+
+
+    # Add script to lines
+    lines.append(f"\n\n# {comment}\n")
+    lines.append("event.smithing(\n")
+    lines.append(f"\t'{result}',\n")
+    lines.append(f"\t'{template}',\n")
+    lines.append(f"\t'{base}',\n")
+    lines.append(f"\t'{addition}'\n")
+    lines.append(")\n")
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
 # ====== VALIDATOR HELPER FUNCTIONS ===========================================
 
 def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
@@ -262,11 +319,10 @@ recipe_modifier_agent = LlmAgent(
     When given a request, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
     The output path should just be "test.txt" for now.
-    For the moment, you are only able to add shapeless and shaped recipes.
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
-    tools=[add_shapeless_recipe, add_shaped_recipe],
+    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe],
     )
 
 
