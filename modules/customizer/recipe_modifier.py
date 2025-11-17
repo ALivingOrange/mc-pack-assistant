@@ -241,6 +241,103 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
 
     return {"status": "success"}
 
+
+def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list[str], output_path: str, xp: float, cooking_time: int) -> dict:
+    """Writes to a KubeJS script to create cooking recipes (smelting, blasting, smoking, campfire).
+
+    Args:
+        comment: A string describing the recipe in natural language. Will be added
+        to the script as a comment. Try to describe what mod each item is from.
+        Ex: "Smelt stone into gravel in furnace and blast furnace."
+
+        ingredient: Item identifier of the input item as a string.
+        For multiple ingredient options, separate each with '|' characters.
+        Ex: "minecraft:stone" or "minecraft:coal|minecraft:charcoal"
+
+        result: Item identifier of result as a string.
+        Ex: "minecraft:gravel"
+
+        methods: A list of cooking methods to use. Valid options are:
+        'smelt' (furnace), 'blast' (blast furnace), 'smoke' (smoker), 'fire' (campfire)
+        Ex: ["smelt", "blast"]
+        Unless otherwise specified, recipes to cook food should usually include:
+        smelt, smoke, fire
+        While methods for smelting ore should be
+        smelt, blast
+
+        xp: Optional XP gained from the recipe as a float. Ex: 0.35
+
+        cooking_time: Optional cooking time in ticks as an int. Default is 200.
+        Value given will be used for smelting; it will be halved in smoker/blast furnace and tripled for campfire.
+
+        output_path: The file path for the script to be written in.
+    """
+    # TO-DO: Validate Item IDs
+
+    # Validate methods
+    valid_methods = {'smelt', 'blast', 'smoke', 'fire'}
+    if not isinstance(methods, list) or len(methods) == 0:
+        return {"status": "error", "error_message": "Methods must be a non-empty list"}
+    
+    for method in methods:
+        if method not in valid_methods:
+            return {"status": "error", "error_message": f"Invalid method '{method}'. Must be one of: {valid_methods}"}
+    
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+
+    # Map method names to KubeJS function names
+    method_map = {
+        'smelt': 'smelting',
+        'blast': 'blasting',
+        'smoke': 'smoking',
+        'fire': 'campfireCooking'
+    }
+
+    lines.append(f"\n\n# {comment}\n")
+    # Add script to lines for each method
+    for method in methods:
+        if '|' in ingredient:
+            ingredient_options = ingredient.split('|')
+            formatted_options = ', '.join(f"'{opt}'" for opt in ingredient_options)
+            ingredient_str = f"[{formatted_options}]"
+        else:
+            ingredient_str = f"'{ingredient}'"
+        
+        # Calculate time factor based on method
+        time_factor = 1.0
+        if method in ['blast', 'smoke']:
+            time_factor = 0.5
+        elif method == 'fire':
+            time_factor = 3.0
+        
+        # Use method chaining approach
+        lines.append(f"event.{method_map[method]}('{result}', {ingredient_str})")
+        
+        lines.append(f".xp({xp})")
+        lines.append(f".cookingTime({int(cooking_time * time_factor)})")
+        lines.append("\n")
+    
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
 # ====== VALIDATOR HELPER FUNCTIONS ===========================================
 
 def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
@@ -322,7 +419,7 @@ recipe_modifier_agent = LlmAgent(
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
-    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe],
+    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe, add_cooking_recipe],
     )
 
 
