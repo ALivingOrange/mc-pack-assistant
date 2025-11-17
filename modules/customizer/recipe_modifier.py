@@ -80,7 +80,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
                 lines.append(f"\t\t'{key}',\n")
             else:
                 lines.append(f"\t\t'{ingredients[key]}x {key}',\n")
-    # Remove comment from last ingredient
+    # Remove comma from last ingredient
     lines[-1] = lines[-1][:-2] + "\n"
     
     lines.append("\t]\n")
@@ -102,7 +102,7 @@ recipe_modifier_agent = LlmAgent(
     model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
     instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods by adding custom recipes or changing or removing existing recipes.
 
-    Your only job is manipulating recipes.
+    Your only job is manipulating recipes. The mod loader being used is Fabric.
     When given a request, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
     The output path should just be "test.txt" for now.
