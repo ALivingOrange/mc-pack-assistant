@@ -12,6 +12,33 @@ import asyncio
 import os
 from pathlib import Path
 
+# Load valid item IDs once at module initialization
+def load_valid_item_ids(file_path: str) -> set:
+    """Load item IDs from file into a set for O(1) lookup."""
+    try:
+        with open(file_path, 'r') as file:
+            # Assuming one ID per line, strip whitespace
+            return {line.strip() for line in file if line.strip()}
+    except IOError as e:
+        print(f"Warning: Could not load item IDs from {file_path}: {e}")
+        return set()
+
+# Load once at module level
+ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "modpack_item_ids.txt"
+VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
+
+def validate_item_id(item_id: str) -> bool:
+    """Check if an item ID is valid. For now, assumes tags are correct."""
+    # Handle tags (they start with #)
+    if item_id.startswith('#'):
+        return True
+    
+    # Handle item IDs with multiple options (separated by |)
+    if '|' in item_id:
+        return all(validate_item_id(id.strip()) for id in item_id.split('|'))
+    
+    return item_id in VALID_ITEM_IDS
+
 # Load API key from file
 api_key_path = Path(__file__).parent.parent.parent / ".api_key"
 with open(api_key_path, 'r') as file:
@@ -48,7 +75,11 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
         output_path: The file path for the script to be written in.
     """
-# TO-DO: Validate Item IDs
+
+    # Validate item IDs
+    for item_id in list(ingredients.keys()) + [result]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
 # Read output file
     try:
@@ -125,7 +156,12 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
 
         output_path: The file path for the script to be written in.
     """
-    # TO-DO: Validate Item IDs
+    
+    # Validate item IDs
+    for item_id in list(ingredients.keys()) + [result]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
+
 
     validation = validate_shaped_recipe(shape, ingredients)
     if not validation["valid"]:
@@ -207,8 +243,11 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
         output_path: The file path for the script to be written in.
     """
 
-    # TO-DO: Validate Item IDs
-    
+    # Validate item IDs
+    for item_id in [template, base, addition, result]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}    
+
     # Read output file
     try:
         with open(output_path, 'r') as file:
@@ -272,7 +311,10 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
         output_path: The file path for the script to be written in.
     """
-    # TO-DO: Validate Item IDs
+    # Validate item IDs
+    for item_id in [ingredient, result]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
     # Validate methods
     valid_methods = {'smelt', 'blast', 'smoke', 'fire'}
@@ -356,6 +398,12 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
 
         output_path: The file path for the script to be written in.
     """
+    # Validate item IDs
+    for item_id in [ingredient, result]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
+
+
     # Read output file
     try:
         with open(output_path, 'r') as file:
@@ -366,8 +414,6 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
     # Remove last line (should be closing "})")        
     if lines: 
         lines = lines[:-1]
-
-    # TO-DO: Validate Item IDs
 
     # Format result with count
     if count > 1:
@@ -390,6 +436,8 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
     return {"status": "success"}
 
 # ====== VALIDATOR HELPER FUNCTIONS ===========================================
+
+
 
 def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
     """Validates the shape and ingredients for a shaped recipe.
