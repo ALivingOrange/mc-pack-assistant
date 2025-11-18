@@ -29,6 +29,8 @@ if (-not (Test-Path $condaEnvPath)) {
     $pipPackages = @(
 	"google-genai"
         "google-adk"
+        "sentence-transformers"
+        "numpy"
     ) 
     conda run -p $condaEnvPath pip install $pipPackages
 }
