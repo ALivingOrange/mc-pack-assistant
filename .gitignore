@@ -16,6 +16,10 @@ modules/customizer/test.txt
 # item ID list from modpack
 modpack_item_ids.txt
 
+# Caches
+cache/
+
+
 # =v=v=v=v= Default Python Gitignore =v=v=v=v=
 # Byte-compiled / optimized / DLL files
 __pycache__/

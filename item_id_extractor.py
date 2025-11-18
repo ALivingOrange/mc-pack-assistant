@@ -1,8 +1,75 @@
 import os
 import json
 import zipfile
+import urllib.request
 from pathlib import Path
 from collections import defaultdict
+
+MCMETA_BASE_URL = "https://raw.githubusercontent.com/misode/mcmeta/registries"
+CACHE_DIR = Path("cache")
+
+def download_vanilla_registry(registry_type, version=None):
+    """Download vanilla item or block registry from MCMeta repo."""
+    CACHE_DIR.mkdir(exist_ok=True)
+    
+    # Use version-specific URL if provided, otherwise use latest
+    if version:
+        url = f"https://raw.githubusercontent.com/misode/mcmeta/{version}-registries/{registry_type}/data.min.json"
+        cache_file = CACHE_DIR / f"{registry_type}_{version}.json"
+    else:
+        url = f"{MCMETA_BASE_URL}/{registry_type}/data.min.json"
+        cache_file = CACHE_DIR / f"{registry_type}_latest.json"
+    
+    # Check if cached file exists
+    if cache_file.exists():
+        print(f"Using cached {registry_type} registry from {cache_file}")
+        with open(cache_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data
+    
+    # Download if not cached
+    print(f"Downloading {registry_type} registry from MCMeta...")
+    try:
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        
+        # Cache the file
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+        
+        print(f"Cached {registry_type} registry to {cache_file}")
+        return data
+    except Exception as e:
+        print(f"Error downloading {registry_type} registry: {e}")
+        return None
+
+def get_vanilla_ids(version=None):
+    """Get vanilla item and block IDs from MCMeta repo."""
+    vanilla_ids = set()
+    
+    # Get items
+    item_data = download_vanilla_registry("item", version)
+    if item_data:
+        # Handle both dict with "values" key and direct list
+        items_list = item_data.get("values", item_data) if isinstance(item_data, dict) else item_data
+        if isinstance(items_list, list):
+            # Add minecraft: prefix to each item
+            vanilla_ids.update(f"minecraft:{item}" for item in items_list)
+            print(f"  Loaded {len(items_list)} vanilla items")
+    
+    # Get blocks (using set automatically handles duplicates)
+    block_data = download_vanilla_registry("block", version)
+    if block_data:
+        # Handle both dict with "values" key and direct list
+        blocks_list = block_data.get("values", block_data) if isinstance(block_data, dict) else block_data
+        if isinstance(blocks_list, list):
+            blocks_before = len(vanilla_ids)
+            # Add minecraft: prefix to each block
+            vanilla_ids.update(f"minecraft:{block}" for block in blocks_list)
+            new_blocks = len(vanilla_ids) - blocks_before
+            print(f"  Loaded {len(blocks_list)} vanilla blocks ({new_blocks} unique)")
+    
+    return vanilla_ids
 
 def extract_ids_from_jar(jar_path):
     """Extract item and block IDs from a single JAR file."""
@@ -55,10 +122,10 @@ def scan_modpack_directory(modpack_path):
     all_items = defaultdict(set)
     all_blocks = defaultdict(set)
     
-    # Find all JAR files
+    # Find all mod JAR files
     jar_files = list(mods_dir.glob('*.jar'))
     
-    print(f"Found {len(jar_files)} JAR files. Processing...")
+    print(f"Found {len(jar_files)} JAR files in mods directory. Processing...")
     
     for i, jar_file in enumerate(jar_files, 1):
         print(f"[{i}/{len(jar_files)}] Processing {jar_file.name}...")
@@ -70,29 +137,43 @@ def scan_modpack_directory(modpack_path):
     
     return all_items, all_blocks
 
-def save_results(items, blocks, output_file='item_ids.txt'):
+def save_results(items, blocks, vanilla_ids, output_file='item_ids.txt'):
     """Save extracted IDs to a text file."""
     with open(output_file, 'w', encoding='utf-8') as f:
-        # Collect all unique items and blocks
-        all_items_set = set()
-        all_blocks_set = set()
+        # Collect all unique items and blocks from mods
+        all_mod_ids = set()
         
         for jar_name, item_set in items.items():
-            all_items_set.update(item_set)
+            all_mod_ids.update(item_set)
         
         for jar_name, block_set in blocks.items():
-            all_blocks_set.update(block_set)
+            all_mod_ids.update(block_set)
         
-        # Combine and sort all IDs
-        all_ids = sorted(all_items_set | all_blocks_set)
+        # Combine mod IDs with vanilla IDs (set union automatically handles duplicates)
+        all_ids = sorted(all_mod_ids | vanilla_ids)
         
         # Write just the IDs, one per line
         for item_id in all_ids:
             f.write(f"{item_id}\n")
+    
+    print(f"\nBreakdown:")
+    print(f"  Unique mod items/blocks: {len(all_mod_ids)}")
+    print(f"  Unique vanilla items/blocks: {len(vanilla_ids)}")
+    print(f"  Total unique IDs (after deduplication): {len(all_ids)}")
 
 def main():
     print("Minecraft Modpack Item ID Extractor")
     print("=" * 60)
+    
+    # Get Minecraft version from user for vanilla items
+    version = input("Enter Minecraft version (e.g., 1.20.1) or press Enter for latest: ").strip()
+    if not version:
+        version = None
+    
+    # Get vanilla items from MCMeta
+    print("\nFetching vanilla items and blocks...")
+    vanilla_ids = get_vanilla_ids(version)
+    print(f"Total unique vanilla items/blocks: {len(vanilla_ids)}")
     
     # Use server/mods directory from working directory
     modpack_path = Path('server')
@@ -102,19 +183,14 @@ def main():
         return
     
     # Scan the modpack
+    print("\nScanning modpack...")
     items, blocks = scan_modpack_directory(modpack_path)
     
     # Save results
     output_file = 'modpack_item_ids.txt'
-    save_results(items, blocks, output_file)
+    save_results(items, blocks, vanilla_ids, output_file)
     
     print(f"\nDone! Results saved to '{output_file}'")
-    
-    # Print summary
-    total_items = sum(len(item_set) for item_set in items.values())
-    total_blocks = sum(len(block_set) for block_set in blocks.values())
-    print(f"Total items found: {total_items}")
-    print(f"Total blocks found: {total_blocks}")
 
 if __name__ == '__main__':
     main()
