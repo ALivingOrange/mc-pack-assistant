@@ -4,7 +4,7 @@ import re
 # --- CONFIGURATION ---
 # UPDATE THIS PATH to your Minecraft instance logs folder
 LOG_PATH = "server/logs/latest.log"
-OUTPUT_FILE = "dumped_recipes.json"
+OUTPUT_FILE = "cache/dumped_recipes.json"
 
 def extract_recipes_from_log():
     print(f"Reading log file: {LOG_PATH}...")
@@ -43,16 +43,17 @@ def extract_recipes_from_log():
         if recipes:
             print(f"Successfully extracted {len(recipes)} recipes.")
             
-            # Save to the clean JSON file your Agent needs
+            # Save to the clean JSON file for RAG use
             with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
                 json.dump(recipes, out, indent=2)
             
             print(f"Saved to {OUTPUT_FILE}")
         else:
-            print("No recipes found. Did you run '/reload' in the server?")
+            print("No recipes found. Check server log and " \
+            "kubejs-scripts/dump_recipes.js")
 
     except FileNotFoundError:
-        print("Error: Could not find the log file. Check your LOG_PATH.")
+        print("Error: Could not find the log file. Is LOG_PATH correct?")
 
 if __name__ == "__main__":
     extract_recipes_from_log()
