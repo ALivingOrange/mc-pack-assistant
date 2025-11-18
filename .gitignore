@@ -13,8 +13,9 @@ conda-env/
 # Test file for recipe modifier
 modules/customizer/test.txt
 
-# item ID list from modpack
+# ID list and recipe dump from modpack
 modpack_item_ids.txt
+dumped_recipes.json
 
 # Caches
 cache/

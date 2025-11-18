@@ -81,7 +81,10 @@ if [ -f "eula.txt" ]; then
 eula=true
 EOF
         echo "EULA accepted. Installing KubeJS and restarting server..."
-
+        # Put KubeJS recipe script into server scripts
+        mkdir -p kubejs/server_scripts
+        cp ../kubejs-scripts/dump_recipes.js kubejs/server_scripts
+        
         # Create mods folder if it doesn't exist
         mkdir -p mods
         cd mods
