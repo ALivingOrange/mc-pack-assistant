@@ -6,6 +6,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import google_search, AgentTool, ToolContext
 from google.adk.code_executors import BuiltInCodeExecutor
+from sentence_transformers import SentenceTransformer
+import numpy as np
+from typing import List, Tuple, Union
+import re
 
 import asyncio
 
@@ -52,6 +56,67 @@ retry_config = types.HttpRetryOptions(
 )
 
 # ====== TOOL DEFINITIONS =====================================================
+
+
+def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
+    """
+    Search for item IDs in the pack relevant to the given queries using semantic search.
+    
+    Args:
+        queries: List of query strings to search for.
+                 Examples: 
+                 - ["diamond tools"]
+                 - ["diamond tools", "iron armor", "redstone components"]
+        
+        top_k_per_query: Number of results to return per query (default 8, max 15)
+    
+    Returns:
+        A dict with:
+        - 'queries': The list of queries searched
+        - 'results': Dict mapping each query to its list of results
+        - 'total_unique_items': Number of unique items found across all queries
+        
+    Example usage:
+        search_item_ids(["diamond sword"]) 
+        -> Returns top 8 items matching "diamond sword"
+        
+        search_item_ids(["red blocks", "blue blocks"], top_k_per_query=5)
+        -> Returns top 5 items for each query
+    """
+    # Limit top_k to reasonable range
+    top_k_per_query = max(1, min(top_k_per_query, 15))
+    
+    try:
+        all_results = {}
+        all_items = set()
+        
+        for query in queries:
+            results = ITEM_SEARCHER.search(query, top_k=top_k_per_query)
+            
+            formatted_results = [
+                {
+                    "item_id": item_id,
+                    "relevance_score": round(score, 3)
+                }
+                for item_id, score in results
+            ]
+            
+            all_results[query] = formatted_results
+            all_items.update(item_id for item_id, _ in results)
+        
+        return {
+            "status": "success",
+            "queries": queries,
+            "results": all_results,
+            "total_unique_items": len(all_items)
+        }
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "error_message": f"Search failed: {str(e)}"
+        }
+
 
 def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int, output_path: str) -> dict:
     """Writes to a KubeJS script to create a shapeless recipe with the given items.
@@ -512,15 +577,88 @@ recipe_modifier_agent = LlmAgent(
     instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods by adding custom recipes or changing or removing existing recipes.
 
     Your only job is manipulating recipes. The mod loader being used is Fabric.
-    When given a request, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
+    When given a request, first, use the search_item_ids tool to search for the item IDs most relevant to the response. Please make at most 5 queries.
+    Then, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
     The output path should just be "test.txt" for now.
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
-    tools=[add_shapeless_recipe, add_shaped_recipe, add_smithing_recipe, add_cooking_recipe, add_stonecutting_recipe],
+    tools=[search_item_ids,
+           add_shapeless_recipe,
+           add_shaped_recipe,
+           add_smithing_recipe,
+           add_cooking_recipe,
+           add_stonecutting_recipe],
     )
 
+# ====== RAG SETUP ============================================================
+
+class ItemIDSearcher:
+    """Semantic search for Minecraft item IDs using embeddings."""
+    
+    def __init__(self, item_ids: List[str], model_name: str = "all-MiniLM-L6-v2"):
+        """
+        Initialize the searcher with item IDs.
+        
+        Args:
+            item_ids: List of valid item IDs
+            model_name: Name of the sentence-transformer model to use
+        """
+        print("Loading embedding model for item search...")
+        self.model = SentenceTransformer(model_name)
+        self.item_ids = list(item_ids)
+        
+        # Precompute embeddings for all item IDs
+        # Transform IDs to be more human-readable for embedding
+        self.item_texts = [self._format_item_for_embedding(item_id) 
+                          for item_id in self.item_ids]
+        
+        print(f"Computing embeddings for {len(self.item_ids)} items...")
+        self.embeddings = self.model.encode(self.item_texts, show_progress_bar=True)
+        print("Item search ready!")
+    
+    def _format_item_for_embedding(self, item_id: str) -> str:
+        """
+        Convert item ID to more semantic text for better embedding.
+        
+        Example: 'minecraft:diamond_sword' -> 'minecraft diamond sword'
+        """
+        # Replace underscores and colons with spaces
+        formatted = item_id.replace(':', ' ').replace('_', ' ')
+        return formatted
+    
+    def search(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:
+        """
+        Search for item IDs relevant to the query.
+        
+        Args:
+            query: Natural language search query
+            top_k: Number of results to return
+            
+        Returns:
+            List of (item_id, similarity_score) tuples, sorted by relevance
+        """
+        # Encode the query
+        query_embedding = self.model.encode([query])[0]
+        
+        # Compute cosine similarities
+        similarities = np.dot(self.embeddings, query_embedding) / (
+            np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_embedding)
+        )
+        
+        # Get top-k indices
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
+        
+        # Return item IDs with scores
+        results = [(self.item_ids[idx], float(similarities[idx])) 
+                   for idx in top_indices]
+        
+        return results
+
+# Initialize searcher at module level
+print("Initializing item ID semantic search...")
+ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 
 # ====== TEST SCRIPT ==========================================================
 
