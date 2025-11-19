@@ -10,6 +10,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from typing import List, Tuple, Union
 import re
+import json
 
 import asyncio
 
@@ -30,6 +31,19 @@ def load_valid_item_ids(file_path: str) -> set:
 # Load once at module level
 ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "modpack_item_ids.txt"
 VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
+
+# Load recipe list once at module initialization
+def load_recipe_list(file_path: str) -> List[dict]:
+    """Load recipe list into a list"""
+    try:
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    except IOError as e:
+        print(f"Warning: Could not load recipes from {file_path}: {e}")
+        return []
+    
+RECIPE_LIST_PATH = Path(__file__).parent.parent.parent / "cache" / "dumped_recipes.json"
+ALL_RECIPES = load_recipe_list(RECIPE_LIST_PATH)
 
 def validate_item_id(item_id: str) -> bool:
     """Check if an item ID is valid. For now, assumes tags are correct."""
@@ -116,6 +130,79 @@ def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
             "status": "error",
             "error_message": f"Search failed: {str(e)}"
         }
+    
+def find_recipes(query_item:str, search_by:str):
+    """
+    Searches all of the recipes in the modpack, using query_item.
+    Recipes with query_item in either the result or in ingredients depending on mode.
+    Unlike search_item_ids, this is an *exact match*.
+    Args:
+        query_item: The item string to look for (e.g., 'minecraft:dandelion').
+        search_by: Either 'result' or 'ingredient'.
+    """
+    matches = []
+    recipes = ALL_RECIPES
+
+    if recipes == []:
+        return {"status": "error", "error_message": "List of recipes is empty!"}
+
+
+    for recipe in recipes:
+        # Safely access the inner 'data' block
+        data = recipe.get("data", {})
+        
+        # -------------------------------------------
+        # MODE 1: Search by Result
+        # -------------------------------------------
+        if search_by == "result":
+            # Most recipes store output in data -> result -> item
+            res = data.get("result", {})
+            # Handle cases where result might be a simple string (rare) or dict
+            if isinstance(res, dict):
+                if res.get("item") == query_item:
+                    matches.append(recipe)
+            elif isinstance(res, str):
+                if res == query_item:
+                    matches.append(recipe)
+
+        # -------------------------------------------
+        # MODE 2: Search by Ingredient
+        # -------------------------------------------
+        elif search_by == "ingredient":
+            found = False
+            
+            # Check 'ingredients' list (Common in shapeless)
+            if "ingredients" in data:
+                for ing in data["ingredients"]:
+                    # Ingredients can be dicts or lists of dicts (for alternatives)
+                    if isinstance(ing, dict) and ing.get("item") == query_item:
+                        found = True
+                    elif isinstance(ing, list): # rare, but happens for tag matches
+                        for sub_ing in ing:
+                            if sub_ing.get("item") == query_item:
+                                found = True
+            
+            # Check 'key' dict (Common in shaped recipes)
+            elif "key" in data:
+                for char, ing_data in data["key"].items():
+                    if isinstance(ing_data, dict) and ing_data.get("item") == query_item:
+                        found = True
+                    # sometimes key values are lists (alternatives)
+                    elif isinstance(ing_data, list):
+                        for sub_ing in ing_data:
+                             if sub_ing.get("item") == query_item:
+                                 found = True
+
+            # Check singular 'ingredient' (Common in smelting/stonecutting)
+            elif "ingredient" in data:
+                ing = data["ingredient"]
+                if isinstance(ing, dict) and ing.get("item") == query_item:
+                    found = True
+
+            if found:
+                matches.append(recipe)
+
+    return {"status": "success", "matches": matches}    
 
 
 def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int, output_path: str) -> dict:
@@ -578,6 +665,7 @@ recipe_modifier_agent = LlmAgent(
 
     Your only job is manipulating recipes. The mod loader being used is Fabric.
     When given a request, first, use the search_item_ids tool to search for the item IDs most relevant to the response. Please make at most 5 queries.
+    Then, you may use find_recipes to find recipes relevant to the request. Note that this tool only returns exact matches, so you should use IDs found with the item ID search.
     Then, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
     The output path should just be "test.txt" for now.
@@ -585,6 +673,7 @@ recipe_modifier_agent = LlmAgent(
     If any tool returns status "error", check the error message and see if you can address it.
     """,
     tools=[search_item_ids,
+           find_recipes,
            add_shapeless_recipe,
            add_shaped_recipe,
            add_smithing_recipe,
