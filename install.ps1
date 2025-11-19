@@ -77,6 +77,11 @@ eula=true
 "@ | Set-Content "eula.txt"
     Write-Host "EULA accepted. Installing KubeJS and restarting server..."
 
+    # Put KubeJS recipe script into server scripts
+    $null = New-Item -ItemType Directory -Path "kubejs\server_scripts" -Force
+    Copy-Item -Path "..\kubejs-scripts\dump_recipes.js" -Destination "kubejs\server_scripts"
+
+
 # Install Required Mods (through Modrinth API)
     Set-location mods
     $mods = @(
