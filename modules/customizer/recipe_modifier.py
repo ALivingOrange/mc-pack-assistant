@@ -71,7 +71,6 @@ retry_config = types.HttpRetryOptions(
 
 # ====== TOOL DEFINITIONS =====================================================
 
-
 def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
     """
     Search for item IDs in the pack relevant to the given queries using semantic search.
@@ -130,7 +129,8 @@ def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
             "status": "error",
             "error_message": f"Search failed: {str(e)}"
         }
-    
+
+
 def find_recipes(query_item:str, search_by:str):
     """
     Searches all of the recipes in the modpack, using query_item.
@@ -177,7 +177,7 @@ def find_recipes(query_item:str, search_by:str):
                     # Ingredients can be dicts or lists of dicts (for alternatives)
                     if isinstance(ing, dict) and ing.get("item") == query_item:
                         found = True
-                    elif isinstance(ing, list): # rare, but happens for tag matches
+                    elif isinstance(ing, list):
                         for sub_ing in ing:
                             if sub_ing.get("item") == query_item:
                                 found = True
@@ -281,6 +281,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
     return {"status": "success"}
 
+
 def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result: str, count: int, output_path: str) -> dict:
     """Writes to a KubeJS script to create a shaped recipe with the given items.
 
@@ -371,6 +372,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
 
     return {"status": "success"}
+
 
 def add_smithing_recipe(comment: str, template: str, base: str, addition: str, result: str, output_path: str) -> dict:
     """Writes to a KubeJS script to create a smithing recipe with the given items.
@@ -532,6 +534,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
     return {"status": "success"}
 
+
 def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int, output_path: str) -> dict:
     """Writes to a KubeJS script to create a stonecutting recipe with the given items.
 
@@ -540,11 +543,11 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
         to the script as a comment. Try to describe what mod each item is from.
         Ex: "Cut planks into sticks on the stonecutter."
 
-        ingredient: Item identifier or tag of the input item as a string.
-        Tags should be prefixed with '#'. Ex: "#minecraft:planks" or "minecraft:stone"
+        ingredient: Item identifier of the input item as a string.
+        Ex: "minecraft:stone"
 
         result: Item identifier of result as a string.
-        Ex: "minecraft:stick"
+        Ex: "minecraft:stone_bricks"
 
         count: Amount of result produced. Ex: 3
 
@@ -576,6 +579,126 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
     # Add script to lines
     lines.append(f"\n\n# {comment}\n")
     lines.append(f"event.stonecutting({result_str}, '{ingredient}')\n")
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
+
+def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
+    """Writes to a KubeJS script to remove recipes based on specific filters.
+
+    Args:
+        comment: A description of the removal.
+        
+        filters: A dictionary of conditions. The recipe must match ALL conditions 
+        to be removed. Common keys:
+        - 'output': Item ID of the result (ex: "minecraft:stone")
+        - 'input': Item ID of an ingredient (ex: "minecraft:cobblestone")
+        - 'mod': Mod ID (ex: "thermal")
+        - 'id': Specific recipe ID (ex: "minecraft:chest")
+        
+        output_path: The file path for the script to be written in.
+    """
+    if not filters:
+        return {"status": "error", "error_message": "Filters dictionary cannot be empty."}
+
+    # 'output' and 'input': Validate Item IDs inside the filter
+    if "output" in filters:
+        if not validate_item_id(filters["output"]):
+            return {"status": "error", "error_message": f"Invalid output item ID: {filters['output']}"}
+    if "input" in filters:
+        if not validate_item_id(filters["input"]):
+            return {"status": "error", "error_message": f"Invalid input item ID: {filters['input']}"}
+
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+    # Convert filter dict to JSON string
+    filter_str = json.dumps(filters)
+
+    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"event.remove({filter_str})\n")
+    lines.append("})")
+
+    # Write back to output file
+    try:
+        with open(output_path, 'w') as file:
+            file.writelines(lines)
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
+
+    return {"status": "success"}
+
+
+def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with: str, output_path: str, filter_criteria: dict) -> dict:
+    """Writes to a KubeJS script to bulk-replace inputs or outputs in recipes.
+
+    Args:
+        comment: A description of the change.
+        
+        type: Must be either "input" or "output". Determines whether to use
+        event.replaceInput() or event.replaceOutput().
+
+        to_replace: The item ID to be replaced.
+        Ex: "minecraft:stick"
+
+        replace_with: The item ID to use as the replacement.
+        Ex: "minecraft:bone"
+
+        output_path: The file path for the script to be written in.
+
+        filter_criteria: Optional dictionary to limit scope. To replace globally, use an empty dict.
+        Keys can be 'mod', 'id', 'input', 'output'. 
+        Ex: {"mod": "minecraft"} to only replace items in Minecraft recipes.
+    """
+    # Validate types
+    if type not in ["input", "output"]:
+        return {"status": "error", "error_message": "Type must be 'input' or 'output'"}
+
+    # Validate item IDs
+    for item_id in [to_replace, replace_with]:
+        if not validate_item_id(item_id):
+            return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
+
+    # Read output file
+    try:
+        with open(output_path, 'r') as file:
+            lines: list[str] = file.readlines()
+    except IOError as e:
+        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    
+    # Remove last line (should be closing "})")        
+    if lines: 
+        lines = lines[:-1]
+
+    # Construct the KubeJS function name
+    func_name = "replaceInput" if type == "input" else "replaceOutput"
+
+    # Convert filter dict to JSON string for JS compatibility
+    # json.dumps produces valid JS object syntax (e.g. {"mod": "minecraft"})
+    filter_str = json.dumps(filter_criteria)
+
+    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"event.{func_name}(\n")
+    lines.append(f"\t{filter_str},\n")       # Arg 1: Filter
+    lines.append(f"\t'{to_replace}',\n")      # Arg 2: Item to replace
+    lines.append(f"\t'{replace_with}'\n")     # Arg 3: Replacement
+    lines.append(")\n")
     lines.append("})")
 
     # Write back to output file
@@ -678,7 +801,10 @@ recipe_modifier_agent = LlmAgent(
            add_shaped_recipe,
            add_smithing_recipe,
            add_cooking_recipe,
-           add_stonecutting_recipe],
+           add_stonecutting_recipe,
+           remove_recipes,
+           replace_recipe_items
+           ],
     )
 
 # ====== RAG SETUP ============================================================
