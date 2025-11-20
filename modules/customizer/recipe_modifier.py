@@ -1,6 +1,6 @@
 from google.genai import types
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -460,7 +460,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
         xp: Optional XP gained from the recipe as a float. Ex: 0.35
 
-        cooking_time: Optional cooking time in ticks as an int. Default is 200.
+        cooking_time: Optional cooking time in ticks as an int. Default is 200. **Don't mess with this unless specifically requested.**
         Value given will be used for smelting; it will be halved in smoker/blast furnace and tripled for campfire.
 
         output_path: The file path for the script to be written in.
@@ -780,24 +780,49 @@ def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
     
     return {"valid": True}
 
-# ====== RECIPE MODIFIER AGENT ================================================
-recipe_modifier_agent = LlmAgent(
-    name="recipe_modifier_agent",
-    model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
-    instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods by adding custom recipes or changing or removing existing recipes.
+# ====== AGENTS ================================================
 
-    Your only job is manipulating recipes. The mod loader being used is Fabric.
-    When given a request, first, use the search_item_ids tool to search for the item IDs most relevant to the response. Please make at most 5 queries.
-    Then, you may use find_recipes to find recipes relevant to the request. Note that this tool only returns exact matches, so you should use IDs found with the item ID search.
-    Then, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
-    All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
-    The output path should just be "test.txt" for now.
+searcher_agent = LlmAgent(
+    name="searcher_agent",
+    model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
+    instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods.
+    Your job is to use your tools to compile relevant information on the game's data. Your are part of a pipeline which makes changes to recipe data.
+
+    When given a user's query. you should make an item ID search to find information on item IDs.
+    Then, use those item IDs in your find_recipes tool.
+    Bear in mind that searching for item ideas uses fuzzier semantic matching, while find_recipes requires exact item IDs to work.
+
+    Once you've found relevant information, summarize along with the user's input and output it to be passed onto the agent which can add, modify, or remove recipes.
+    Do not include suggestions in your summary; keep it only to accurate data.
+    Make sure that the agent gets real, correct item IDs and recipe data!
+
+    **Your output is sent to another agent. Don't reply as if speaking directly to the user; only your fellow agent will see it.**
 
     If any tool returns status "error", check the error message and see if you can address it.
     """,
     tools=[search_item_ids,
-           find_recipes,
-           add_shapeless_recipe,
+           find_recipes],
+    output_key="search_result_summary"
+    )
+
+
+recipe_modifier_agent = LlmAgent(
+    name="recipe_modifier_agent",
+    model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
+    instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods by adding custom recipes or changing or removing existing recipes.
+    Your only job is manipulating recipes. So, if there's a more vague query, like "Make copper harder to get," don't worry about non-recipe interventions such as loot table changes. *Don't even mention them.*
+    Try to bear in mind the intended purpose of blocks as you can. For instance, if you decrease the yield of copper blocks to make copper harder to get from structures, make sure it also decreases how many ingots it takes to craft them so they still fulfill the purpose of compressing ingot storage.
+    The mod loader being used is Fabric.
+    After processing the information from the searcher, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
+    All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
+    The output path should just be "test.txt" for now.
+
+    # This is your current job and the most relevant game data:
+    {search_result_summary}
+
+    If any tool returns status "error", check the error message and see if you can address it.
+    """,
+    tools=[add_shapeless_recipe,
            add_shaped_recipe,
            add_smithing_recipe,
            add_cooking_recipe,
@@ -806,6 +831,11 @@ recipe_modifier_agent = LlmAgent(
            replace_recipe_items
            ],
     )
+
+root_agent = SequentialAgent(
+    name="RecipeModifierPipeline",
+    sub_agents=[searcher_agent,recipe_modifier_agent]
+)
 
 # ====== RAG SETUP ============================================================
 
@@ -896,7 +926,7 @@ async def main():
     
     # Initialize session and runner
     session_service = InMemorySessionService()
-    runner = Runner(agent=recipe_modifier_agent, app_name="default", session_service=session_service)
+    runner = Runner(agent=root_agent, app_name="default", session_service=session_service)
     
     # Attempt to create new session or retrieve existing
     try:
