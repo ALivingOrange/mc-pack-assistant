@@ -788,7 +788,7 @@ searcher_agent = LlmAgent(
     instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods.
     Your job is to use your tools to compile relevant information on the game's data. Your are part of a pipeline which makes changes to recipe data.
 
-    When given a user's query. you should make an item ID search to find information on item IDs.
+    When given a user's query. you should make an item ID search to find information on item IDs. Use as many search queries as you feel necessary.
     Then, use those item IDs in your find_recipes tool.
     Bear in mind that searching for item ideas uses fuzzier semantic matching, while find_recipes requires exact item IDs to work.
 
