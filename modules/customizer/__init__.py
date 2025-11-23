@@ -1,1 +1,1 @@
-from .recipe_modifier import add_shapeless_recipe
+from .recipe_modifier_agent import add_shapeless_recipe
