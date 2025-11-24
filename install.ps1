@@ -31,6 +31,7 @@ if (-not (Test-Path $condaEnvPath)) {
         "google-adk"
         "sentence-transformers"
         "numpy"
+        "gradio"
     ) 
     conda run -p $condaEnvPath pip install $pipPackages
 }

@@ -21,8 +21,7 @@ if [ ! -d "$CONDA_ENV_PATH" ]; then
     echo "Installing required packages..."
     
     # Install pip packages
-    # Note: Array syntax in bash is ( "item1" "item2" )
-    pip_packages="google-genai google-adk sentence-transformers numpy"
+    pip_packages="google-genai google-adk sentence-transformers numpy gradio"
     
     conda run -p "$CONDA_ENV_PATH" pip install $pip_packages
 fi
