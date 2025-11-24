@@ -58,7 +58,7 @@ def validate_item_id(item_id: str) -> bool:
     return item_id in VALID_ITEM_IDS
 
 # Load API key from file
-api_key_path = Path(__file__).parent.parent.parent / ".api_key"
+api_key_path = Path(__file__).parent.parent.parent/ "cache" / ".api_key"
 with open(api_key_path, 'r') as file:
     os.environ["GOOGLE_API_KEY"] = file.read().strip()
 

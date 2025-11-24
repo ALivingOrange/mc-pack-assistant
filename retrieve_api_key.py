@@ -1,7 +1,7 @@
 import os
 
-# Define the filename for the API key.
-KEY_FILE = ".api_key"
+# Define the location for the API key.
+KEY_FILE = "cache/.api_key"
 
 def save_api_key():
     """

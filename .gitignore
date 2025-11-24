@@ -4,9 +4,6 @@ server/
 # JRE files
 jre/
 
-# Api Key
-.api_key
-
 # Conda environment
 conda-env/
 
