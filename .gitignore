@@ -7,8 +7,9 @@ jre/
 # Conda environment
 conda-env/
 
-# Test file for recipe modifier
+# Test file for recipe modifier (direct run, through webui)
 modules/customizer/test.txt
+test.txt
 
 # ID list and recipe dump from modpack
 modpack_item_ids.txt

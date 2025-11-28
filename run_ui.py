@@ -1,8 +1,11 @@
 import sys
 import os
 import platform
+import asyncio
+from typing import Optional, Tuple, AsyncGenerator, Any
 
-def ensure_environment(env_name="conda-env"):
+# ===== Environment ===========================================================
+def ensure_environment(env_name: str = "conda-env") -> None:
     """
     Checks if the script is running via the python interpreter in the
     sibling folder. If not, re-launches the script using that interpreter.
@@ -19,30 +22,105 @@ def ensure_environment(env_name="conda-env"):
         print(f"Error: Could not find Conda environment at: {target_python}. Do you need to run the install script?")
         sys.exit(1)
 
-    current_exe = os.path.normpath(sys.executable)
-    target_python = os.path.normpath(target_python)
+    else:
+        current_exe = os.path.normpath(sys.executable)
+        target_python = os.path.normpath(target_python)
 
-    if current_exe != target_python:
-        print(f"Switching to local environment: {env_name}...")
-        
-        # Use os.execv to replace the current process with the new one
-        # This keeps the PID the same and passes all arguments forward
-        os.execv(target_python, [target_python, __file__] + sys.argv[1:])
+        if current_exe != target_python:
+            print(f"Switching to local environment: {env_name}...")
+            os.execv(target_python, [target_python, __file__] + sys.argv[1:])
 
 ensure_environment("conda-env")
 
-# from modules import customizer
-import gradio as gr
+# ===== Initialization ========================================================
 
-def toggle_window(current_state):
+import gradio as gr
+from modules.customizer import root_agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+if not os.path.exists("test.txt"):
+    try:
+        with open("test.txt", 'x') as file:
+            file.write("ServerEvents.recipes(event =>{\n\n\n})")
+        print("Created default test.txt")
+    except Exception as e:
+        print(f"Error creating test.txt: {e}")
+else:
+    print("Found existing test.txt")
+
+
+# ===== Session Logic =========================================================
+
+USER_ID: str = "default"
+session_service = InMemorySessionService()
+runner = Runner(agent=root_agent, app_name="default", session_service=session_service)
+
+
+async def process_message(
+    user_input: str, 
+    current_session_id: Optional[str]
+) -> AsyncGenerator[Tuple[str, str], None]:
+    """
+    Async generator that handles the agent interaction.
+    
+    Args:
+        user_input: The text string from the user.
+        current_session_id: The ID stored in gr.State.
+        
+    Yields:
+        Tuple[str, str]: (updated_response_text, updated_session_id)
+    """
+    if not user_input or not user_input.strip():
+        yield "", current_session_id if current_session_id else ""
+        return
+
+    # --- Session Management ---
+    if current_session_id is None:
+        try:
+            session = await session_service.create_session(
+                app_name="default", user_id=USER_ID, session_id="default"
+            )
+        except Exception:
+            # Fallback to get_session if create fails
+            session = await session_service.get_session(
+                app_name="default", user_id=USER_ID, session_id="default"
+            )
+        current_session_id = session.id
+        print(f"Active session: {current_session_id}")
+
+    # --- Agent Query ---
+    query = types.Content(role="user", parts=[types.Part(text=user_input)])
+    
+    accumulated_response: str = ""
+    
+    try:
+        # Run the agent with streaming
+        async for event in runner.run_async(
+            user_id=USER_ID, 
+            session_id=current_session_id, 
+            new_message=query
+        ):
+            if event.content and event.content.parts:
+                part_text = event.content.parts[0].text
+                if part_text and part_text != "None":
+                    accumulated_response += part_text
+                    yield accumulated_response, current_session_id
+                    
+    except Exception as e:
+        error_msg = f"Error: {str(e)}"
+        print(error_msg)
+        yield error_msg, current_session_id
+
+# ===== GUI ===================================================================
+
+def toggle_window(current_state: bool) -> Tuple[bool, dict]:
     new_state = not current_state
     return new_state, gr.update(visible=new_state)
 
-def process_message(user_input):
-    # Placeholder for AI agent interaction
-    return f"You said: {user_input}"
-
 with gr.Blocks() as demo:
+    session_state = gr.State(value=None)
     window_state = gr.State(False)
     modifier_btn = gr.Button("Recipe Modifier")
 
@@ -52,7 +130,7 @@ with gr.Blocks() as demo:
             
             user_input = gr.Textbox(
                 label="Your message",
-                placeholder="Enter your message here...",
+                placeholder="Enter instructions for the recipe agent...",
                 lines=1
             )
             
@@ -60,22 +138,23 @@ with gr.Blocks() as demo:
             
             output = gr.Textbox(
                 label="Response",
-                lines=5,
-                interactive=False
+                lines=10,
+                interactive=False,
+                autoscroll=True
             )
             
             # Button click handler
             submit_btn.click(
                 fn=process_message,
-                inputs=user_input,
-                outputs=output
+                inputs=[user_input, session_state], # Pass input and current session ID
+                outputs=[output, session_state]     # Update output and save session ID
             )
             
             # Enter key handler
             user_input.submit(
                 fn=process_message,
-                inputs=user_input,
-                outputs=output
+                inputs=[user_input, session_state],
+                outputs=[output, session_state]
             )
 
     modifier_btn.click(
@@ -85,4 +164,4 @@ with gr.Blocks() as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.queue().launch()
