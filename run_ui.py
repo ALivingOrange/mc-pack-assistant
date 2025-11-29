@@ -113,6 +113,20 @@ async def process_message(
         print(error_msg)
         yield error_msg, current_session_id
 
+def save_api_key(api_key: str):
+    if not api_key.strip():
+        return "Error: Key cannot be empty."
+    
+    try:
+        os.makedirs("cache", exist_ok=True)
+        
+        key_file = "cache/.api_key"
+        with open(key_file, "w") as f:
+            f.write(api_key.strip())
+        return "API Key saved. You must restart the UI for this to take effect."
+    except Exception as e:
+        return f"Error saving key: {str(e)}"
+
 # ===== GUI ===================================================================
 
 def toggle_window(current_state: bool) -> Tuple[bool, dict]:
@@ -120,6 +134,25 @@ def toggle_window(current_state: bool) -> Tuple[bool, dict]:
     return new_state, gr.update(visible=new_state)
 
 with gr.Blocks() as demo:
+    with gr.Accordion("Settings / API Key", open=False):
+            gr.Markdown("Enter your Gemini API Key below if it is not already set.")
+            with gr.Row():
+                api_key_input = gr.Textbox(
+                    label="Gemini API Key", 
+                    type="password", 
+                    placeholder="key go here...",
+                    scale=4
+                )
+                save_key_btn = gr.Button("Save Key", scale=1)
+            
+            save_status = gr.Label(label="Status", show_label=False)
+
+            save_key_btn.click(
+                fn=save_api_key,
+                inputs=api_key_input,
+                outputs=save_status
+            )
+
     session_state = gr.State(value=None)
     window_state = gr.State(False)
     modifier_btn = gr.Button("Recipe Modifier")
