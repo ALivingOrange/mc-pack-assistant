@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import os
 import platform
@@ -113,6 +114,8 @@ async def process_message(
         print(error_msg)
         yield error_msg, current_session_id
 
+# ===== Other logic ===========================================================
+
 def save_api_key(api_key: str):
     if not api_key.strip():
         return "Error: Key cannot be empty."
@@ -127,6 +130,20 @@ def save_api_key(api_key: str):
     except Exception as e:
         return f"Error saving key: {str(e)}"
 
+def run_extractor():
+    script_path = os.path.join("helper-scripts", "ui", "item_id_extractor.py")
+
+    if not os.path.exists(script_path):
+        return f"Error: Could not find script at {script_path}"
+
+    try:
+        subprocess.run([sys.executable, script_path], check=True)
+        return "Extractor script ran successfully!"
+    except subprocess.CalledProcessError as e:
+        return f"Error running script: {e}"
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
 # ===== GUI ===================================================================
 
 def toggle_window(current_state: bool) -> Tuple[bool, dict]:
@@ -135,6 +152,8 @@ def toggle_window(current_state: bool) -> Tuple[bool, dict]:
 
 with gr.Blocks() as demo:
     with gr.Accordion("Settings / API Key", open=False):
+            gr.Markdown("### Pre-run Checks")
+            gr.Markdown("#### Run each of these, then restart the UI before first use.")
             gr.Markdown("Enter your Gemini API Key below if it is not already set.")
             with gr.Row():
                 api_key_input = gr.Textbox(
@@ -151,6 +170,17 @@ with gr.Blocks() as demo:
                 fn=save_api_key,
                 inputs=api_key_input,
                 outputs=save_status
+            )
+            gr.Markdown("---")
+            with gr.Row():
+                gr.Markdown("Extract Item IDs for use in agent searches.")
+                extractor_btn = gr.Button("Run Item ID Extractor", scale=1)
+            extractor_status = gr.Textbox(label="Extractor Output", lines=1, interactive=False)
+
+            extractor_btn.click(
+                fn=run_extractor,
+                inputs=None,
+                outputs=extractor_status
             )
 
     session_state = gr.State(value=None)
