@@ -165,10 +165,14 @@ def main():
     print("Minecraft Modpack Item ID Extractor")
     print("=" * 60)
     
+    """
     # Get Minecraft version from user for vanilla items
     version = input("Enter Minecraft version (e.g., 1.20.1) or press Enter for latest: ").strip()
     if not version:
         version = None
+    """ # For now just assume version is 1.20.1
+
+    version = "1.20.1"
     
     # Get vanilla items from MCMeta
     print("\nFetching vanilla items and blocks...")
