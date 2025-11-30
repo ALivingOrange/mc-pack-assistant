@@ -151,9 +151,8 @@ def toggle_window(current_state: bool) -> Tuple[bool, dict]:
     return new_state, gr.update(visible=new_state)
 
 with gr.Blocks() as demo:
-    with gr.Accordion("Settings / API Key", open=False):
-            gr.Markdown("### Pre-run Checks")
-            gr.Markdown("#### Run each of these, then restart the UI before first use.")
+    with gr.Accordion("Setup", open=False):
+            gr.Markdown("### Run each of these, then restart the UI before first use.")
             gr.Markdown("Enter your Gemini API Key below if it is not already set.")
             with gr.Row():
                 api_key_input = gr.Textbox(

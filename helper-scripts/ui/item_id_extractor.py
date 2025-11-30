@@ -191,7 +191,7 @@ def main():
     items, blocks = scan_modpack_directory(modpack_path)
     
     # Save results
-    output_file = 'modpack_item_ids.txt'
+    output_file = CACHE_DIR / 'modpack_item_ids.txt'
     save_results(items, blocks, vanilla_ids, output_file)
     
     print(f"\nDone! Results saved to '{output_file}'")

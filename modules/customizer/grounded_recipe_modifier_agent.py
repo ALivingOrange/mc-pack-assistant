@@ -29,7 +29,7 @@ def load_valid_item_ids(file_path: str) -> set:
         return set()
 
 # Load once at module level
-ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "modpack_item_ids.txt"
+ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "cache" / "modpack_item_ids.txt"
 VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
 
 # Load recipe list once at module initialization
