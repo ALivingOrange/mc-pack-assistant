@@ -144,6 +144,90 @@ def run_extractor():
     except Exception as e:
         return f"Unexpected error: {str(e)}"
 
+def recipe_server_run():
+    """
+    Runs the Minecraft server, waits for the recipe dump trigger,
+    stops the server, and runs the catcher script.
+    """
+    server_dir = os.path.join(os.getcwd(), "server") 
+
+    jre_path = os.path.join(os.getcwd(), "jre", "bin", "java.exe")
+
+    if not os.path.exists(jre_path):
+        return f"Error: Portable Java not found at {jre_path}"
+
+    server_command = [jre_path, "-Xmx4G", "-jar", "server.jar", "nogui"]
+
+    catcher_script = os.path.join("helper-scripts", "ui", "catch_recipe_dump.py")
+    
+    trigger_prefix = "AGENTSYS_RECIPE_DUMP_END::"
+    recipe_count = 0
+    log_capture = []
+
+    if not os.path.exists(catcher_script):
+        return f"Error: Catcher script not found at {catcher_script}"
+
+
+    try:
+        log_capture.append("Starting server...")
+        server_process = subprocess.Popen(
+            server_command,
+            cwd=server_dir,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+
+        found_trigger = False
+
+        for line in server_process.stdout:
+            sys.stdout.write(line) 
+            
+            if trigger_prefix in line:
+                found_trigger = True
+                try:
+                    parts = line.strip().split("::")
+                    if len(parts) > 1:
+                        recipe_count = parts[1]
+                except:
+                    recipe_count = "Unknown"
+
+                log_capture.append(f"Trigger detected! Recipes dumped: {recipe_count}")
+                log_capture.append("Sending 'stop' command...")
+                
+                server_process.stdin.write("/stop\n")
+                server_process.stdin.flush()
+                break
+        
+        server_process.wait()
+        log_capture.append("Server shutdown complete.")
+
+        if not found_trigger:
+            return "Server stopped without seeing the trigger phrase."
+
+    except Exception as e:
+        return f"Error running server: {str(e)}"
+
+    try:
+        log_capture.append(f"Running catcher script...")
+        catch_result = subprocess.run(
+            [sys.executable, catcher_script],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        log_capture.append("Catcher script finished successfully.")
+        log_capture.append(f"Output: {catch_result.stdout}")
+        
+    except subprocess.CalledProcessError as e:
+        log_capture.append(f"Catcher script failed: {e.stderr}")
+    except Exception as e:
+        log_capture.append(f"Error running catcher: {str(e)}")
+
+    return "\n".join(log_capture)
+
 # ===== GUI ===================================================================
 
 def toggle_window(current_state: bool) -> Tuple[bool, dict]:
@@ -175,6 +259,18 @@ with gr.Blocks() as demo:
                 gr.Markdown("Extract Item IDs for use in agent searches.")
                 extractor_btn = gr.Button("Run Item ID Extractor", scale=1)
             extractor_status = gr.Textbox(label="Extractor Output", lines=1, interactive=False)
+            gr.Markdown("---")
+            with gr.Row():
+                gr.Markdown("Run Server, Dump Recipes, & Catch Results")
+                dump_btn = gr.Button("Run Recipe Dump Cycle", scale=1)
+            
+            dump_status = gr.Textbox(label="Dump Cycle Status", lines=6, interactive=False)
+
+            dump_btn.click(
+                fn=recipe_server_run,
+                inputs=None,
+                outputs=dump_status
+            )
 
             extractor_btn.click(
                 fn=run_extractor,

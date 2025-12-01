@@ -56,7 +56,7 @@ if (-not (Test-Path "server")) {
 Set-Location "server"
 
 # Download server jar if not present
-$jarFile = "fabric-server-mc.1.20.1-loader.0.18.0-launcher.1.1.0.jar"
+$jarFile = "server.jar"
 if (-not (Test-Path $jarFile)) {
     Invoke-WebRequest -Uri "https://meta.fabricmc.net/v2/versions/loader/1.20.1/0.18.0/1.1.0/server/jar" -OutFile $jarFile
 }

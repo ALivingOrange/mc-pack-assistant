@@ -56,7 +56,7 @@ fi
 cd "server"
 
 # 5. Download server jar if not present
-JAR_FILE="fabric-server-mc.1.20.1-loader.0.18.0-launcher.1.1.0.jar"
+JAR_FILE="server.jar"
 if [ ! -f "$JAR_FILE" ]; then
     curl -L -o "$JAR_FILE" "https://meta.fabricmc.net/v2/versions/loader/1.20.1/0.18.0/1.1.0/server/jar"
 fi
