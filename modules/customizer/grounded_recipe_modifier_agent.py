@@ -69,6 +69,15 @@ retry_config = types.HttpRetryOptions(
     http_status_codes=[429, 500, 503, 504],  # Retry on these HTTP errors
 )
 
+# Set up valid text file.
+OUTPUT_PATH:str = Path(__file__).parent.parent.parent/ "server" / "kubejs" / "server_scripts" / "test.js"
+
+if not os.path.exists(OUTPUT_PATH):
+    with open(OUTPUT_PATH, 'x') as file:
+        file.write("ServerEvents.recipes(event =>{\n\n\n})")
+else:
+    print("Repeat test. Make sure the output ends in a line with })!")
+
 # ====== TOOL DEFINITIONS =====================================================
 
 def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
@@ -205,7 +214,7 @@ def find_recipes(query_item:str, search_by:str):
     return {"status": "success", "matches": matches}    
 
 
-def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int, output_path: str) -> dict:
+def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int) -> dict:
     """Writes to a KubeJS script to create a shapeless recipe with the given items.
 
     Args:
@@ -224,8 +233,6 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
         Ex: "minecraft:fire_charge"
 
         count: Amount of result produced. Ex: 1
-
-        output_path: The file path for the script to be written in.
     """
 
     # Validate item IDs
@@ -235,7 +242,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
 # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines:list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -245,7 +252,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
 
 # Add script to lines
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append("event.shapeless(\n")
     lines.append(f"\tItem.of('{result}', {count}),\n")
     lines.append("\t[\n")
@@ -274,7 +281,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
 
 # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -282,7 +289,7 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
     return {"status": "success"}
 
 
-def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result: str, count: int, output_path: str) -> dict:
+def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result: str, count: int) -> dict:
     """Writes to a KubeJS script to create a shaped recipe with the given items.
 
     Args:
@@ -306,8 +313,6 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
         Ex: "minecraft:chest"
 
         count: Amount of result produced. Ex: 1
-
-        output_path: The file path for the script to be written in.
     """
     
     # Validate item IDs
@@ -322,7 +327,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
 
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -333,7 +338,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
 
 
     # Add script to lines
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append("event.shaped(\n")
     lines.append(f"\tItem.of('{result}', {count}),\n")
     lines.append("\t[\n")
@@ -366,7 +371,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -374,7 +379,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
     return {"status": "success"}
 
 
-def add_smithing_recipe(comment: str, template: str, base: str, addition: str, result: str, output_path: str) -> dict:
+def add_smithing_recipe(comment: str, template: str, base: str, addition: str, result: str) -> dict:
     """Writes to a KubeJS script to create a smithing recipe with the given items.
 
     Args:
@@ -393,8 +398,6 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
 
         result: Item identifier of result as a string.
         Ex: "minecraft:netherite_ingot"
-
-        output_path: The file path for the script to be written in.
     """
 
     # Validate item IDs
@@ -404,7 +407,7 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
 
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -416,7 +419,7 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
 
 
     # Add script to lines
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append("event.smithing(\n")
     lines.append(f"\t'{result}',\n")
     lines.append(f"\t'{template}',\n")
@@ -427,7 +430,7 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -435,7 +438,7 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
     return {"status": "success"}
 
 
-def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list[str], output_path: str, xp: float, cooking_time: int) -> dict:
+def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list[str], xp: float = 0.35, cooking_time: int = 200) -> dict:
     """Writes to a KubeJS script to create cooking recipes (smelting, blasting, smoking, campfire).
 
     Args:
@@ -462,8 +465,6 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
         cooking_time: Optional cooking time in ticks as an int. Default is 200. **Don't mess with this unless specifically requested.**
         Value given will be used for smelting; it will be halved in smoker/blast furnace and tripled for campfire.
-
-        output_path: The file path for the script to be written in.
     """
     # Validate item IDs
     for item_id in [ingredient, result]:
@@ -481,7 +482,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
     
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -499,7 +500,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
         'fire': 'campfireCooking'
     }
 
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     # Add script to lines for each method
     for method in methods:
         if '|' in ingredient:
@@ -527,7 +528,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -535,7 +536,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
     return {"status": "success"}
 
 
-def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int, output_path: str) -> dict:
+def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int) -> dict:
     """Writes to a KubeJS script to create a stonecutting recipe with the given items.
 
     Args:
@@ -550,8 +551,6 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
         Ex: "minecraft:stone_bricks"
 
         count: Amount of result produced. Ex: 3
-
-        output_path: The file path for the script to be written in.
     """
     # Validate item IDs
     for item_id in [ingredient, result]:
@@ -561,7 +560,7 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
 
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -577,13 +576,13 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
         result_str = f"'{result}'"
 
     # Add script to lines
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append(f"event.stonecutting({result_str}, '{ingredient}')\n")
     lines.append("})")
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -591,7 +590,7 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
     return {"status": "success"}
 
 
-def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
+def remove_recipes(comment: str, filters: dict) -> dict:
     """Writes to a KubeJS script to remove recipes based on specific filters.
 
     Args:
@@ -603,8 +602,6 @@ def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
         - 'input': Item ID of an ingredient (ex: "minecraft:cobblestone")
         - 'mod': Mod ID (ex: "thermal")
         - 'id': Specific recipe ID (ex: "minecraft:chest")
-        
-        output_path: The file path for the script to be written in.
     """
     if not filters:
         return {"status": "error", "error_message": "Filters dictionary cannot be empty."}
@@ -619,7 +616,7 @@ def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
 
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -631,13 +628,13 @@ def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
     # Convert filter dict to JSON string
     filter_str = json.dumps(filters)
 
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append(f"event.remove({filter_str})\n")
     lines.append("})")
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -645,7 +642,7 @@ def remove_recipes(comment: str, filters: dict, output_path: str) -> dict:
     return {"status": "success"}
 
 
-def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with: str, output_path: str, filter_criteria: dict) -> dict:
+def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with: str, filter_criteria: dict) -> dict:
     """Writes to a KubeJS script to bulk-replace inputs or outputs in recipes.
 
     Args:
@@ -659,8 +656,6 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
 
         replace_with: The item ID to use as the replacement.
         Ex: "minecraft:bone"
-
-        output_path: The file path for the script to be written in.
 
         filter_criteria: Optional dictionary to limit scope. To replace globally, use an empty dict.
         Keys can be 'mod', 'id', 'input', 'output'. 
@@ -677,7 +672,7 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
 
     # Read output file
     try:
-        with open(output_path, 'r') as file:
+        with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
@@ -693,7 +688,7 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
     # json.dumps produces valid JS object syntax (e.g. {"mod": "minecraft"})
     filter_str = json.dumps(filter_criteria)
 
-    lines.append(f"\n\n# {comment}\n")
+    lines.append(f"\n\n// {comment}\n")
     lines.append(f"event.{func_name}(\n")
     lines.append(f"\t{filter_str},\n")       # Arg 1: Filter
     lines.append(f"\t'{to_replace}',\n")      # Arg 2: Item to replace
@@ -703,7 +698,7 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
 
     # Write back to output file
     try:
-        with open(output_path, 'w') as file:
+        with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
     except IOError as e:
         return {"status": "error", "error_message": ("Error writing file: " + str(e))}
@@ -815,8 +810,7 @@ recipe_modifier_agent = LlmAgent(
     The mod loader being used is Fabric.
     After processing the information from the searcher, take a deep breath and write a paragraph considering how to fulfill the request through the tools that you have available.
     All recipe-modification tools should receive a comment explaining what you're using them to add as their first argument.
-    The output path should just be "test.txt" for now.
-
+    
     # This is your current job and the most relevant game data:
     {search_result_summary}
 
@@ -909,12 +903,7 @@ ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 
 async def main():
     """Run an interactive terminal dialogue with the recipe modifier agent."""
-    # Set up valid text file.
-    if not os.path.exists("test.txt"):
-        with open("test.txt", 'x') as file:
-            file.write("ServerEvents.recipes(event =>{\n\n\n})")
-    else:
-        print("Repeat test. Make sure test.txt ends in a line with })!")
+
     
     print("=" * 70)
     print("MINECRAFT RECIPE MODIFIER AGENT - Interactive Test")

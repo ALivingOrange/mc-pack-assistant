@@ -41,16 +41,6 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-if not os.path.exists("test.txt"):
-    try:
-        with open("test.txt", 'x') as file:
-            file.write("ServerEvents.recipes(event =>{\n\n\n})")
-        print("Created default test.txt")
-    except Exception as e:
-        print(f"Error creating test.txt: {e}")
-else:
-    print("Found existing test.txt")
-
 
 # ===== Session Logic =========================================================
 
