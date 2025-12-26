@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-There are over a hundred thousand Minecraft modpacks out there (can be seen at: modpackindex.com/modpacks), yet only very few do much more than selecting mods. Modpacks can be made much more cohesive with custom integrations such as recipes and loot tables. The success of this approach can be seen in popular packs such as Create: Above and Beyond and Gregtech: New Horizons. However, the process of making these integrations is technical and burdensome. Going through hundreds to thousands of items added by mods and figuring out ways to connect them takes a lot of effort, to say nothing of learning the datapack format or how to use KubeJS and implementing the integrations one at a time. The comparison to just adding mods, with how most launchers can bring a new mod into the pack with one or two clicks, is dire. The average packmaker would benefit greatly from a way to add tailor-made integrations just as easily as they might add new mods.
+There are over a hundred thousand Minecraft modpacks out there (visible at [this modpack index](modpackindex.com)), yet only very few do much more than selecting mods. Modpacks can be made much more cohesive with custom integrations such as recipes and loot tables. The success of this approach can be seen in popular packs such as Create: Above and Beyond and Gregtech: New Horizons. However, the process of making these integrations is technical and burdensome. Going through hundreds to thousands of items added by mods and figuring out ways to connect them takes a lot of effort, to say nothing of learning the datapack format or how to use KubeJS and implementing the integrations one at a time. The comparison to just adding mods, with how most launchers can bring a new mod into the pack with one or two clicks, is dire. The average packmaker would benefit greatly from a way to add tailor-made integrations just as easily as they might add new mods.
 
 ## Solution Statement
 
@@ -38,7 +38,7 @@ This agent has seven tools:
     remove_recipes,
     replace_recipe_items
     `
-These all write KubeJS script matching syntax seen in https://kubejs.com/wiki/tutorials/recipes.
+These all write KubeJS script matching syntax seen in [the KubeJS docs](https://kubejs.com/wiki/tutorials/recipes).
 
 #### Validation
 All of the tools which require exact item IDs, namely the recipe modifier tools and the `find_recipes` tool, call a `validate_item_id` function to verify that they're only using real item IDs, providing an error to the agent informing it that the recipe is invalid if necessary.
@@ -56,11 +56,11 @@ I have many ideas for expansions on this project, which can be seen in the issue
 
 # Installation & Use
 
-Requires Miniconda, which can be installed at https://docs.conda.io/en/latest/miniconda.html.
+Requires Miniconda, which can be installed from [here](https://docs.conda.io/en/latest/miniconda.html).
 
 First, clone the repository. From the repository root directory, run install.ps1 on Windows (requires Unrestricted execution policy) or install.sh on Linux x64. You will be prompted to agree to the Microsoft EULA to be able to run the server.
 
-After the server is installed, you may add all the mods that you wish to the server/mods/ directory, as normal. There's currently no built-in compatibility checker functionality, so it's recommended to use an existing modpack. Note that you'll need to add KubeJS and its requirements to the pack for clients to be able to connect to the server.
+After the server is installed, you may add all the mods that you wish to the `server/mods/` directory, as normal. There's currently no built-in compatibility checker functionality, so it's recommended to use an existing modpack. Note that you'll need to add KubeJS and its requirements to the pack for clients to be able to connect to the server.
 
 From there, you can run the webui from the terminal with `python run_ui.py`. Run all of the parts in the setup section and restart the UI before your first run.
 
