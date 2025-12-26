@@ -17,7 +17,8 @@ import asyncio
 import os
 from pathlib import Path
 
-# Load valid item IDs once at module initialization
+# ====== Loading on Module Initialization =====================================
+
 def load_valid_item_ids(file_path: str) -> set:
     """Load item IDs from file into a set for O(1) lookup."""
     try:
@@ -28,11 +29,9 @@ def load_valid_item_ids(file_path: str) -> set:
         print(f"Warning: Could not load item IDs from {file_path}: {e}")
         return set()
 
-# Load once at module level
 ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "cache" / "modpack_item_ids.txt"
 VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
 
-# Load recipe list once at module initialization
 def load_recipe_list(file_path: str) -> List[dict]:
     """Load recipe list into a list"""
     try:
@@ -66,7 +65,7 @@ retry_config = types.HttpRetryOptions(
     attempts=5,  # Maximum retry attempts
     exp_base=7,  # Delay multiplier
     initial_delay=1,
-    http_status_codes=[429, 500, 503, 504],  # Retry on these HTTP errors
+    http_status_codes=[429, 500, 503, 504],
 )
 
 # Set up valid text file.
@@ -105,7 +104,6 @@ def search_item_ids(queries: List[str], top_k_per_query: int = 8) -> dict:
         search_item_ids(["red blocks", "blue blocks"], top_k_per_query=5)
         -> Returns top 5 items for each query
     """
-    # Limit top_k to reasonable range
     top_k_per_query = max(1, min(top_k_per_query, 15))
     
     try:
@@ -160,11 +158,9 @@ def find_recipes(query_item:str, search_by:str):
         # Safely access the inner 'data' block
         data = recipe.get("data", {})
         
-        # -------------------------------------------
-        # MODE 1: Search by Result
-        # -------------------------------------------
+
+        # --- MODE 1: Search by Result --------------
         if search_by == "result":
-            # Most recipes store output in data -> result -> item
             res = data.get("result", {})
             # Handle cases where result might be a simple string (rare) or dict
             if isinstance(res, dict):
@@ -174,9 +170,7 @@ def find_recipes(query_item:str, search_by:str):
                 if res == query_item:
                     matches.append(recipe)
 
-        # -------------------------------------------
-        # MODE 2: Search by Ingredient
-        # -------------------------------------------
+        # --- MODE 2: Search by Ingredient ----------
         elif search_by == "ingredient":
             found = False
             
@@ -235,17 +229,16 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
         count: Amount of result produced. Ex: 1
     """
 
-    # Validate item IDs
     for item_id in list(ingredients.keys()) + [result]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-# Read output file
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines:list[str] = file.readlines()
     except IOError as e:
         return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+
 # Remove last line (should be closing "})")        
     if lines: lines = lines[:-1]
 
@@ -261,13 +254,11 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str,count: int
         if '|' in key:
             ingredient_options = key.split('|')
             formatted_options = ', '.join(f"'{opt}'" for opt in ingredient_options)
-            # Only specify count if >1
             if ingredients[key] == 1:
                 lines.append(f"\t\t[{formatted_options}],\n")
             else:
                 lines.append(f"\t\t'{ingredients[key]}x [{formatted_options}]',\n")
         else:
-            # Only specify count if >1
             if ingredients[key] == 1:
                 lines.append(f"\t\t'{key}',\n")
             else:
@@ -315,7 +306,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
         count: Amount of result produced. Ex: 1
     """
     
-    # Validate item IDs
+    
     for item_id in list(ingredients.keys()) + [result]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
@@ -325,7 +316,7 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
     if not validation["valid"]:
         return {"status": "error", "error_message": validation["error_message"]}
 
-    # Read output file
+    
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -369,7 +360,6 @@ def add_shaped_recipe(comment: str, shape: list[str], ingredients: dict, result:
     lines.append(")\n")
     lines.append("})")
 
-    # Write back to output file
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -400,12 +390,10 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
         Ex: "minecraft:netherite_ingot"
     """
 
-    # Validate item IDs
     for item_id in [template, base, addition, result]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}    
 
-    # Read output file
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -428,7 +416,7 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
     lines.append(")\n")
     lines.append("})")
 
-    # Write back to output file
+
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -466,7 +454,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
         cooking_time: Optional cooking time in ticks as an int. Default is 200. **Don't mess with this unless specifically requested.**
         Value given will be used for smelting; it will be halved in smoker/blast furnace and tripled for campfire.
     """
-    # Validate item IDs
+    
     for item_id in [ingredient, result]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
@@ -480,7 +468,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
         if method not in valid_methods:
             return {"status": "error", "error_message": f"Invalid method '{method}'. Must be one of: {valid_methods}"}
     
-    # Read output file
+    
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -526,7 +514,7 @@ def add_cooking_recipe(comment: str, ingredient: str, result: str, methods: list
     
     lines.append("})")
 
-    # Write back to output file
+
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -552,13 +540,13 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
 
         count: Amount of result produced. Ex: 3
     """
-    # Validate item IDs
+    
     for item_id in [ingredient, result]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
 
-    # Read output file
+    
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -580,7 +568,7 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
     lines.append(f"event.stonecutting({result_str}, '{ingredient}')\n")
     lines.append("})")
 
-    # Write back to output file
+
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -614,7 +602,7 @@ def remove_recipes(comment: str, filters: dict) -> dict:
         if not validate_item_id(filters["input"]):
             return {"status": "error", "error_message": f"Invalid input item ID: {filters['input']}"}
 
-    # Read output file
+    
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -632,7 +620,7 @@ def remove_recipes(comment: str, filters: dict) -> dict:
     lines.append(f"event.remove({filter_str})\n")
     lines.append("})")
 
-    # Write back to output file
+
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -661,16 +649,15 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
         Keys can be 'mod', 'id', 'input', 'output'. 
         Ex: {"mod": "minecraft"} to only replace items in Minecraft recipes.
     """
-    # Validate types
     if type not in ["input", "output"]:
         return {"status": "error", "error_message": "Type must be 'input' or 'output'"}
 
-    # Validate item IDs
+    
     for item_id in [to_replace, replace_with]:
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-    # Read output file
+    
     try:
         with open(OUTPUT_PATH, 'r') as file:
             lines: list[str] = file.readlines()
@@ -685,7 +672,6 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
     func_name = "replaceInput" if type == "input" else "replaceOutput"
 
     # Convert filter dict to JSON string for JS compatibility
-    # json.dumps produces valid JS object syntax (e.g. {"mod": "minecraft"})
     filter_str = json.dumps(filter_criteria)
 
     lines.append(f"\n\n// {comment}\n")
@@ -696,7 +682,7 @@ def replace_recipe_items(comment: str, type: str, to_replace: str, replace_with:
     lines.append(")\n")
     lines.append("})")
 
-    # Write back to output file
+
     try:
         with open(OUTPUT_PATH, 'w') as file:
             file.writelines(lines)
@@ -719,15 +705,12 @@ def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
     Returns:
         A dict with 'valid' (bool) and 'error_message' (str) if invalid.
     """
-    # Validate shape is a list
     if not isinstance(shape, list):
         return {"valid": False, "error_message": "Shape must be a list of strings"}
     
-    # Validate shape has 1-3 rows
     if len(shape) < 1 or len(shape) > 3:
         return {"valid": False, "error_message": "Shape must have 1-3 rows"}
     
-    # Validate each row
     for i, row in enumerate(shape):
         if not isinstance(row, str):
             return {"valid": False, "error_message": f"Row {i} must be a string"}
@@ -735,35 +718,28 @@ def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
         if len(row) < 1 or len(row) > 3:
             return {"valid": False, "error_message": f"Row {i} must be 1-3 characters long"}
         
-        # Check that row only contains A-I and spaces
         for char in row:
             if char not in 'ABCDEFGHI ':
                 return {"valid": False, "error_message": f"Row {i} contains invalid character '{char}'. Only A-I and spaces are allowed"}
     
-    # Collect all letters used in shape
     letters_in_shape = set()
     for row in shape:
         for char in row:
             if char != ' ':
                 letters_in_shape.add(char)
     
-    # Validate ingredients is a dict
     if not isinstance(ingredients, dict):
         return {"valid": False, "error_message": "Ingredients must be a dictionary"}
     
-    # Collect all letters in ingredients
     letters_in_ingredients = set(ingredients.values())
     
-    # Validate that all letters in ingredients are A-I
     for letter in letters_in_ingredients:
         if not isinstance(letter, str) or len(letter) != 1 or letter not in 'ABCDEFGHI':
             return {"valid": False, "error_message": f"Invalid ingredient letter '{letter}'. Must be A-I"}
     
-    # Check for duplicate letters in ingredients
     if len(letters_in_ingredients) != len(ingredients):
         return {"valid": False, "error_message": "Duplicate letters found in ingredients. Each ingredient must map to a unique letter"}
     
-    # Validate that all letters in shape have corresponding ingredients
     missing_ingredients = letters_in_shape - letters_in_ingredients
     if missing_ingredients:
         return {"valid": False, "error_message": f"Letters {missing_ingredients} used in shape but not defined in ingredients"}
@@ -863,7 +839,6 @@ class ItemIDSearcher:
         
         Example: 'minecraft:diamond_sword' -> 'minecraft diamond sword'
         """
-        # Replace underscores and colons with spaces
         formatted = item_id.replace(':', ' ').replace('_', ' ')
         return formatted
     
@@ -878,7 +853,6 @@ class ItemIDSearcher:
         Returns:
             List of (item_id, similarity_score) tuples, sorted by relevance
         """
-        # Encode the query
         query_embedding = self.model.encode([query])[0]
         
         # Compute cosine similarities
@@ -886,16 +860,12 @@ class ItemIDSearcher:
             np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_embedding)
         )
         
-        # Get top-k indices
         top_indices = np.argsort(similarities)[-top_k:][::-1]
         
-        # Return item IDs with scores
         results = [(self.item_ids[idx], float(similarities[idx])) 
                    for idx in top_indices]
-        
         return results
 
-# Initialize searcher at module level
 print("Initializing item ID semantic search...")
 ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 
@@ -913,14 +883,12 @@ async def main():
     
     USER_ID = "default"
     
-    # Initialize session and runner
     session_service = InMemorySessionService()
     runner = Runner(agent=root_agent, app_name="default", session_service=session_service)
     
-    # Attempt to create new session or retrieve existing
-    try:
+    try: # New session
         session = await session_service.create_session(app_name="default", user_id=USER_ID, session_id="default")
-    except:
+    except: # If that fails try to grab existing session
         session = await session_service.get_session(app_name="default", user_id=USER_ID, session_id="default")
     
     session_id = session.id
@@ -929,16 +897,13 @@ async def main():
     
     while True:
         try:
-            # Get user input
             user_input = input("\nYou: ").strip()
             
-            # Check for exit commands
             if user_input.lower() in ['quit', 'exit', 'q']:
                 print("\nEnding session. Goodbye!")
                 break
             
-            # Skip empty inputs
-            if not user_input:
+            if not user_input: # Skip empty inputs
                 continue
             
             print("\nAgent: ", end="", flush=True)
@@ -946,7 +911,6 @@ async def main():
             # Convert the query string to the ADK Content format
             query = types.Content(role="user", parts=[types.Part(text=user_input)])
             
-            # Run the agent with streaming
             async for event in runner.run_async(user_id=USER_ID, session_id=session_id, new_message=query):
                 # Check if the event contains valid content
                 if event.content and event.content.parts:
