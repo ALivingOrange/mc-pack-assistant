@@ -20,20 +20,17 @@ def download_vanilla_registry(registry_type, version=None):
         url = f"{MCMETA_BASE_URL}/{registry_type}/data.min.json"
         cache_file = CACHE_DIR / f"{registry_type}_latest.json"
     
-    # Check if cached file exists
     if cache_file.exists():
         print(f"Using cached {registry_type} registry from {cache_file}")
         with open(cache_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data
     
-    # Download if not cached
     print(f"Downloading {registry_type} registry from MCMeta...")
     try:
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode('utf-8'))
         
-        # Cache the file
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump(data, f)
         
@@ -47,24 +44,20 @@ def get_vanilla_ids(version=None):
     """Get vanilla item and block IDs from MCMeta repo."""
     vanilla_ids = set()
     
-    # Get items
     item_data = download_vanilla_registry("item", version)
     if item_data:
-        # Handle both dict with "values" key and direct list
         items_list = item_data.get("values", item_data) if isinstance(item_data, dict) else item_data
         if isinstance(items_list, list):
-            # Add minecraft: prefix to each item
             vanilla_ids.update(f"minecraft:{item}" for item in items_list)
             print(f"  Loaded {len(items_list)} vanilla items")
     
-    # Get blocks (using set automatically handles duplicates)
     block_data = download_vanilla_registry("block", version)
     if block_data:
         # Handle both dict with "values" key and direct list
         blocks_list = block_data.get("values", block_data) if isinstance(block_data, dict) else block_data
         if isinstance(blocks_list, list):
             blocks_before = len(vanilla_ids)
-            # Add minecraft: prefix to each block
+
             vanilla_ids.update(f"minecraft:{block}" for block in blocks_list)
             new_blocks = len(vanilla_ids) - blocks_before
             print(f"  Loaded {len(blocks_list)} vanilla blocks ({new_blocks} unique)")
@@ -78,7 +71,6 @@ def extract_ids_from_jar(jar_path):
     
     try:
         with zipfile.ZipFile(jar_path, 'r') as jar:
-            # Get list of all files in the JAR
             file_list = jar.namelist()
             
             # Find the mod ID from the assets directory
@@ -91,14 +83,12 @@ def extract_ids_from_jar(jar_path):
             
             # For each mod ID, look for model files
             for mod_id in mod_ids:
-                # Check item models
                 item_path_prefix = f'assets/{mod_id}/models/item/'
                 for file in file_list:
                     if file.startswith(item_path_prefix) and file.endswith('.json'):
                         item_name = file[len(item_path_prefix):-5]  # Remove path and .json
                         items.add(f'{mod_id}:{item_name}')
                 
-                # Check block models
                 block_path_prefix = f'assets/{mod_id}/models/block/'
                 for file in file_list:
                     if file.startswith(block_path_prefix) and file.endswith('.json'):
@@ -122,7 +112,6 @@ def scan_modpack_directory(modpack_path):
     all_items = defaultdict(set)
     all_blocks = defaultdict(set)
     
-    # Find all mod JAR files
     jar_files = list(mods_dir.glob('*.jar'))
     
     print(f"Found {len(jar_files)} JAR files in mods directory. Processing...")
@@ -149,10 +138,8 @@ def save_results(items, blocks, vanilla_ids, output_file='item_ids.txt'):
         for jar_name, block_set in blocks.items():
             all_mod_ids.update(block_set)
         
-        # Combine mod IDs with vanilla IDs (set union automatically handles duplicates)
         all_ids = sorted(all_mod_ids | vanilla_ids)
         
-        # Write just the IDs, one per line
         for item_id in all_ids:
             f.write(f"{item_id}\n")
     
@@ -170,27 +157,24 @@ def main():
     version = input("Enter Minecraft version (e.g., 1.20.1) or press Enter for latest: ").strip()
     if not version:
         version = None
-    """ # For now just assume version is 1.20.1
-
+    """
+    
+    # For now just assume version is 1.20.1
     version = "1.20.1"
     
-    # Get vanilla items from MCMeta
     print("\nFetching vanilla items and blocks...")
     vanilla_ids = get_vanilla_ids(version)
     print(f"Total unique vanilla items/blocks: {len(vanilla_ids)}")
     
-    # Use server/mods directory from working directory
     modpack_path = Path('server')
     
     if not os.path.exists(modpack_path):
         print(f"Error: Directory '{modpack_path}' not found!")
         return
     
-    # Scan the modpack
     print("\nScanning modpack...")
     items, blocks = scan_modpack_directory(modpack_path)
     
-    # Save results
     output_file = CACHE_DIR / 'modpack_item_ids.txt'
     save_results(items, blocks, vanilla_ids, output_file)
     
