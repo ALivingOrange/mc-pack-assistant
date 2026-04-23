@@ -12,6 +12,14 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from sentence_transformers import SentenceTransformer
 
+from .config import (
+    ITEM_IDS_PATH,
+    MODEL_NAME,
+    OUTPUT_PATH,
+    RECIPE_LIST_PATH,
+    retry_config,
+)
+
 logger = logging.getLogger(__name__)
 
 # ====== Loading on Module Initialization =====================================
@@ -28,7 +36,6 @@ def load_valid_item_ids(file_path: str) -> set:
         return set()
 
 
-ITEM_IDS_PATH = Path(__file__).parent.parent.parent / "cache" / "modpack_item_ids.txt"
 VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
 
 
@@ -42,7 +49,6 @@ def load_recipe_list(file_path: str) -> list[dict]:
         return []
 
 
-RECIPE_LIST_PATH = Path(__file__).parent.parent.parent / "cache" / "dumped_recipes.json"
 ALL_RECIPES = load_recipe_list(RECIPE_LIST_PATH)
 
 
@@ -71,18 +77,6 @@ if not os.environ.get("GOOGLE_API_KEY"):
             "provided.",
             api_key_path,
         )
-
-retry_config = types.HttpRetryOptions(
-    attempts=5,  # Maximum retry attempts
-    exp_base=7,  # Delay multiplier
-    initial_delay=1,
-    http_status_codes=[429, 500, 503, 504],
-)
-
-# Set up valid text file.
-OUTPUT_PATH: Path = (
-    Path(__file__).parent.parent.parent / "server" / "kubejs" / "server_scripts" / "test.js"
-)
 
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 if not OUTPUT_PATH.exists():
@@ -779,7 +773,7 @@ def validate_shaped_recipe(shape: list[str], ingredients: dict) -> dict:
 
 searcher_agent = LlmAgent(
     name="searcher_agent",
-    model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
+    model=Gemini(model=MODEL_NAME, retry_options=retry_config),
     instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods.
     Your job is to use your tools to compile relevant information on the game's data. Your are part of a pipeline which makes changes to recipe data.
 
@@ -802,7 +796,7 @@ searcher_agent = LlmAgent(
 
 recipe_modifier_agent = LlmAgent(
     name="recipe_modifier_agent",
-    model=Gemini(model="gemini-2.5-flash", retry_options=retry_config),
+    model=Gemini(model=MODEL_NAME, retry_options=retry_config),
     instruction="""You are a smart assistant to aid in the custom integration of Minecraft mods by adding custom recipes or changing or removing existing recipes.
     Your only job is manipulating recipes. So, if there's a more vague query, like "Make copper harder to get," don't worry about non-recipe interventions such as loot table changes. *Don't even mention them.*
     Try to bear in mind the intended purpose of blocks as you can. For instance, if you decrease the yield of copper blocks to make copper harder to get from structures, make sure it also decreases how many ingots it takes to craft them so they still fulfill the purpose of compressing ingot storage.
