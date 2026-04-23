@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from sentence_transformers import SentenceTransformer
 
+logger = logging.getLogger(__name__)
+
 # ====== Loading on Module Initialization =====================================
 
 
@@ -21,7 +24,7 @@ def load_valid_item_ids(file_path: str) -> set:
             # Assuming one ID per line, strip whitespace
             return {line.strip() for line in file if line.strip()}
     except OSError as e:
-        print(f"Warning: Could not load item IDs from {file_path}: {e}")
+        logger.warning("Could not load item IDs from %s: %s", file_path, e)
         return set()
 
 
@@ -35,7 +38,7 @@ def load_recipe_list(file_path: str) -> list[dict]:
         with open(file_path) as file:
             return json.load(file)
     except OSError as e:
-        print(f"Warning: Could not load recipes from {file_path}: {e}")
+        logger.warning("Could not load recipes from %s: %s", file_path, e)
         return []
 
 
@@ -77,7 +80,7 @@ if not os.path.exists(OUTPUT_PATH):
     with open(OUTPUT_PATH, "x") as file:
         file.write("ServerEvents.recipes(event =>{\n\n\n})")
 else:
-    print("Repeat test. Make sure the output ends in a line with })!")
+    logger.info("Repeat test. Make sure the output ends in a line with })!")
 
 # ====== TOOL DEFINITIONS =====================================================
 
@@ -832,7 +835,7 @@ class ItemIDSearcher:
             item_ids: List of valid item IDs
             model_name: Name of the sentence-transformer model to use
         """
-        print("Loading embedding model for item search...")
+        logger.info("Loading embedding model for item search...")
         self.model = SentenceTransformer(model_name)
         self.item_ids = list(item_ids)
 
@@ -840,9 +843,9 @@ class ItemIDSearcher:
         # Transform IDs to be more human-readable for embedding
         self.item_texts = [self._format_item_for_embedding(item_id) for item_id in self.item_ids]
 
-        print(f"Computing embeddings for {len(self.item_ids)} items...")
+        logger.info("Computing embeddings for %d items...", len(self.item_ids))
         self.embeddings = self.model.encode(self.item_texts, show_progress_bar=True)
-        print("Item search ready!")
+        logger.info("Item search ready!")
 
     def _format_item_for_embedding(self, item_id: str) -> str:
         """
@@ -877,7 +880,7 @@ class ItemIDSearcher:
         return results
 
 
-print("Initializing item ID semantic search...")
+logger.info("Initializing item ID semantic search...")
 ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 
 # ====== TEST SCRIPT ==========================================================
@@ -886,11 +889,11 @@ ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 async def main():
     """Run an interactive terminal dialogue with the recipe modifier agent."""
 
-    print("=" * 70)
-    print("MINECRAFT RECIPE MODIFIER AGENT - Interactive Test")
-    print("=" * 70)
-    print("\nThis agent can help you create custom Minecraft recipes.")
-    print("Type 'quit' or 'exit' to end the conversation.\n")
+    logger.info("=" * 70)
+    logger.info("MINECRAFT RECIPE MODIFIER AGENT - Interactive Test")
+    logger.info("=" * 70)
+    logger.info("This agent can help you create custom Minecraft recipes.")
+    logger.info("Type 'quit' or 'exit' to end the conversation.")
 
     USER_ID = "default"
 
@@ -907,15 +910,15 @@ async def main():
         )
 
     session_id = session.id
-    print(f"Session started (ID: {session_id})")
-    print("-" * 70)
+    logger.info("Session started (ID: %s)", session_id)
+    logger.info("-" * 70)
 
     while True:
         try:
             user_input = input("\nYou: ").strip()
 
             if user_input.lower() in ["quit", "exit", "q"]:
-                print("\nEnding session. Goodbye!")
+                logger.info("Ending session. Goodbye!")
                 break
 
             if not user_input:  # Skip empty inputs
@@ -938,15 +941,16 @@ async def main():
             print()  # Newline after response
 
         except KeyboardInterrupt:
-            print("\n\nInterrupted by user. Ending session.")
+            logger.info("Interrupted by user. Ending session.")
             break
         except Exception as e:
-            print(f"\nError: {e}")
-            print("Continuing session...\n")
+            logger.error("Error: %s", e)
+            logger.info("Continuing session...")
 
-    print("-" * 70)
-    print("Session ended.")
+    logger.info("-" * 70)
+    logger.info("Session ended.")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     asyncio.run(main())

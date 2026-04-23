@@ -1,11 +1,14 @@
 import json
+import logging
 
 LOG_PATH = "server/logs/latest.log"
 OUTPUT_FILE = "cache/dumped_recipes.json"
 
+logger = logging.getLogger(__name__)
+
 
 def extract_recipes_from_log():
-    print(f"Reading log file: {LOG_PATH}...")
+    logger.info("Reading log file: %s...", LOG_PATH)
 
     recipes = []
     capturing = False
@@ -14,13 +17,13 @@ def extract_recipes_from_log():
         with open(LOG_PATH, encoding="utf-8", errors="ignore") as f:
             for line in f:
                 if "AGENTSYS_RECIPE_DUMP_START" in line:
-                    print("Found dump start marker. Capturing...")
+                    logger.info("Found dump start marker. Capturing...")
                     recipes = []  # Reset in case of multiple dumps
                     capturing = True
                     continue
 
                 if "AGENTSYS_RECIPE_DUMP_END" in line:
-                    print("Found dump end marker.")
+                    logger.info("Found dump end marker.")
                     capturing = False
                     break
 
@@ -30,21 +33,22 @@ def extract_recipes_from_log():
                         recipe_obj = json.loads(raw_json)
                         recipes.append(recipe_obj)
                     except Exception as e:
-                        print(f"Failed to parse line: {e}")
+                        logger.warning("Failed to parse line: %s", e)
 
         if recipes:
-            print(f"Successfully extracted {len(recipes)} recipes.")
+            logger.info("Successfully extracted %d recipes.", len(recipes))
 
             with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
                 json.dump(recipes, out, indent=2)
 
-            print(f"Saved to {OUTPUT_FILE}")
+            logger.info("Saved to %s", OUTPUT_FILE)
         else:
-            print("No recipes found. Check server log and kubejs-scripts/dump_recipes.js")
+            logger.warning("No recipes found. Check server log and kubejs-scripts/dump_recipes.js")
 
     except FileNotFoundError:
-        print("Error: Could not find the log file. Is LOG_PATH correct?")
+        logger.error("Could not find the log file. Is LOG_PATH correct?")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     extract_recipes_from_log()

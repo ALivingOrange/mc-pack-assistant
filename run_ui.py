@@ -1,8 +1,12 @@
+import logging
 import os
 import platform
 import subprocess
 import sys
 from collections.abc import AsyncGenerator
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 # ===== Environment ===========================================================
@@ -20,8 +24,9 @@ def ensure_environment(env_name: str = "conda-env") -> None:
         target_python = os.path.join(env_path, "bin", "python")
 
     if not os.path.exists(target_python):
-        print(
-            f"Error: Could not find Conda environment at: {target_python}. Do you need to run the install script?"
+        logger.error(
+            "Could not find Conda environment at: %s. Do you need to run the install script?",
+            target_python,
         )
         sys.exit(1)
 
@@ -30,7 +35,7 @@ def ensure_environment(env_name: str = "conda-env") -> None:
         target_python = os.path.normpath(target_python)
 
         if current_exe != target_python:
-            print(f"Switching to local environment: {env_name}...")
+            logger.info("Switching to local environment: %s...", env_name)
             os.execv(target_python, [target_python, __file__] + sys.argv[1:])
 
 
@@ -81,7 +86,7 @@ async def process_message(
                 app_name="default", user_id=USER_ID, session_id="default"
             )
         current_session_id = session.id
-        print(f"Active session: {current_session_id}")
+        logger.info("Active session: %s", current_session_id)
 
     # --- Agent Query ---
     query = types.Content(role="user", parts=[types.Part(text=user_input)])
@@ -101,7 +106,7 @@ async def process_message(
 
     except Exception as e:
         error_msg = f"Error: {str(e)}"
-        print(error_msg)
+        logger.exception("Agent run failed")
         yield error_msg, current_session_id
 
 
