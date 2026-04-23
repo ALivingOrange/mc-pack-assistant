@@ -63,7 +63,9 @@ if (Test-Path "eula.txt") {
     $response = Read-Host "Do you agree to this EULA? (y/n)"
     
     if ($response -eq 'y') {
-        $timestamp = Get-Date -Format "ddd MMM dd HH:mm:ss 'PST' yyyy"
+        $tz = [System.TimeZoneInfo]::Local.StandardName
+        $timestamp = Get-Date -Format "ddd MMM dd HH:mm:ss yyyy"
+        $timestamp = "$timestamp $tz"
         @"
 #By changing the setting below to TRUE you are indicating your agreement to our EULA (https://aka.ms/MinecraftEULA).
 #$timestamp

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import platform
@@ -143,14 +144,15 @@ def run_extractor():
         return f"Unexpected error: {str(e)}"
 
 
-def recipe_server_run():
+def _recipe_server_run_blocking():
     """
     Runs the Minecraft server, waits for the recipe dump trigger,
     stops the server, and runs the catcher script.
     """
     server_dir = os.path.join(os.getcwd(), "server")
 
-    jre_path = os.path.join(os.getcwd(), "jre", "bin", "java.exe")
+    java_binary = "java.exe" if platform.system() == "Windows" else "java"
+    jre_path = os.path.join(os.getcwd(), "jre", "bin", java_binary)
 
     if not os.path.exists(jre_path):
         return f"Error: Portable Java not found at {jre_path}"
@@ -222,6 +224,10 @@ def recipe_server_run():
         log_capture.append(f"Error running catcher: {str(e)}")
 
     return "\n".join(log_capture)
+
+
+async def recipe_server_run():
+    return await asyncio.to_thread(_recipe_server_run_blocking)
 
 
 # ===== GUI ===================================================================

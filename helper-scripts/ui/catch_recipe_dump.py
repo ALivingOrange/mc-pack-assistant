@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 
 LOG_PATH = "server/logs/latest.log"
 OUTPUT_FILE = "cache/dumped_recipes.json"
@@ -38,6 +39,7 @@ def extract_recipes_from_log():
         if recipes:
             logger.info("Successfully extracted %d recipes.", len(recipes))
 
+            Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
             with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
                 json.dump(recipes, out, indent=2)
 

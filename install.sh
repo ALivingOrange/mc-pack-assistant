@@ -22,16 +22,31 @@ fi
 
 if [ ! -d "jre" ]; then
     echo "Installing JRE..."
-    # Linux x64 version of the JRE release
-    JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.9%2B10/OpenJDK21U-jre_x64_linux_hotspot_21.0.9_10.tar.gz"
-    
+
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64|amd64)
+            JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.9%2B10/OpenJDK21U-jre_x64_linux_hotspot_21.0.9_10.tar.gz"
+            ;;
+        aarch64|arm64)
+            JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.9%2B10/OpenJDK21U-jre_aarch64_linux_hotspot_21.0.9_10.tar.gz"
+            ;;
+        *)
+            echo "Unsupported architecture: $ARCH. Please install a JRE manually into ./jre."
+            exit 1
+            ;;
+    esac
+
     curl -L -o "jre.tar.gz" "$JRE_URL"
     tar -xzf "jre.tar.gz"
-    
-    if [ -d "jdk-21.0.9+10-jre" ]; then
-        mv "jdk-21.0.9+10-jre" "jre"
-    fi
-    
+
+    for d in jdk-21.0.9+10-jre*; do
+        if [ -d "$d" ]; then
+            mv "$d" "jre"
+            break
+        fi
+    done
+
     rm "jre.tar.gz"
 fi
 

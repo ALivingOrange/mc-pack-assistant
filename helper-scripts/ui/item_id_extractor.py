@@ -188,6 +188,7 @@ def main():
     logger.info("Scanning modpack...")
     items, blocks = scan_modpack_directory(modpack_path)
 
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     output_file = CACHE_DIR / "modpack_item_ids.txt"
     save_results(items, blocks, vanilla_ids, output_file)
 

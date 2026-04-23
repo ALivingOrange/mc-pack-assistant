@@ -59,10 +59,18 @@ def validate_item_id(item_id: str) -> bool:
     return item_id in VALID_ITEM_IDS
 
 
-# Load API key from file
-api_key_path = Path(__file__).parent.parent.parent / "cache" / ".api_key"
-with open(api_key_path) as file:
-    os.environ["GOOGLE_API_KEY"] = file.read().strip()
+# Load API key: prefer existing env var, else fall back to cache file if present.
+if not os.environ.get("GOOGLE_API_KEY"):
+    api_key_path = Path(__file__).parent.parent.parent / "cache" / ".api_key"
+    try:
+        with open(api_key_path) as file:
+            os.environ["GOOGLE_API_KEY"] = file.read().strip()
+    except OSError:
+        logger.warning(
+            "GOOGLE_API_KEY not set and %s not readable; agent calls will fail until one is "
+            "provided.",
+            api_key_path,
+        )
 
 retry_config = types.HttpRetryOptions(
     attempts=5,  # Maximum retry attempts
@@ -72,11 +80,12 @@ retry_config = types.HttpRetryOptions(
 )
 
 # Set up valid text file.
-OUTPUT_PATH: str = (
+OUTPUT_PATH: Path = (
     Path(__file__).parent.parent.parent / "server" / "kubejs" / "server_scripts" / "test.js"
 )
 
-if not os.path.exists(OUTPUT_PATH):
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+if not OUTPUT_PATH.exists():
     with open(OUTPUT_PATH, "x") as file:
         file.write("ServerEvents.recipes(event =>{\n\n\n})")
 else:
