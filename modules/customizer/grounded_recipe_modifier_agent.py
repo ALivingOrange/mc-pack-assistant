@@ -12,44 +12,10 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from sentence_transformers import SentenceTransformer
 
-from .config import (
-    ITEM_IDS_PATH,
-    MODEL_NAME,
-    OUTPUT_PATH,
-    RECIPE_LIST_PATH,
-    retry_config,
-)
+from .config import MODEL_NAME, OUTPUT_PATH, retry_config
+from .data import ALL_RECIPES, VALID_ITEM_IDS
 
 logger = logging.getLogger(__name__)
-
-# ====== Loading on Module Initialization =====================================
-
-
-def load_valid_item_ids(file_path: str) -> set:
-    """Load item IDs from file into a set for O(1) lookup."""
-    try:
-        with open(file_path) as file:
-            # Assuming one ID per line, strip whitespace
-            return {line.strip() for line in file if line.strip()}
-    except OSError as e:
-        logger.warning("Could not load item IDs from %s: %s", file_path, e)
-        return set()
-
-
-VALID_ITEM_IDS = load_valid_item_ids(ITEM_IDS_PATH)
-
-
-def load_recipe_list(file_path: str) -> list[dict]:
-    """Load recipe list into a list"""
-    try:
-        with open(file_path) as file:
-            return json.load(file)
-    except OSError as e:
-        logger.warning("Could not load recipes from %s: %s", file_path, e)
-        return []
-
-
-ALL_RECIPES = load_recipe_list(RECIPE_LIST_PATH)
 
 
 def validate_item_id(item_id: str) -> bool:
