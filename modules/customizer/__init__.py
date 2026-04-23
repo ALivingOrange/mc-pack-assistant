@@ -1,1 +1,1 @@
-from .grounded_recipe_modifier_agent import root_agent
+from .grounded_recipe_modifier_agent import root_agent as root_agent

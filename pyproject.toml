@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mc-pack-assistant"
+version = "0.1.0"
+description = "Agent-driven custom integrations for Minecraft modpacks (recipes, and more)."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0",
+    "google-adk>=1.0",
+    "sentence-transformers>=3.0",
+    "numpy>=1.24",
+    "gradio>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["modules*"]
+namespaces = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+# E501 (line-too-long) is not auto-fixable by `ruff format` and fires mostly
+# on long strings / docstrings here — disable globally.
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

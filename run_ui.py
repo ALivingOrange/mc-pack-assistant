@@ -1,9 +1,9 @@
-import subprocess
-import sys
 import os
 import platform
-import asyncio
-from typing import Optional, Tuple, AsyncGenerator, Any
+import subprocess
+import sys
+from collections.abc import AsyncGenerator
+
 
 # ===== Environment ===========================================================
 def ensure_environment(env_name: str = "conda-env") -> None:
@@ -13,14 +13,16 @@ def ensure_environment(env_name: str = "conda-env") -> None:
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     env_path = os.path.join(script_dir, env_name)
-    
+
     if platform.system() == "Windows":
         target_python = os.path.join(env_path, "python.exe")
-    else: # Linux or Mac
+    else:  # Linux or Mac
         target_python = os.path.join(env_path, "bin", "python")
 
     if not os.path.exists(target_python):
-        print(f"Error: Could not find Conda environment at: {target_python}. Do you need to run the install script?")
+        print(
+            f"Error: Could not find Conda environment at: {target_python}. Do you need to run the install script?"
+        )
         sys.exit(1)
 
     else:
@@ -31,16 +33,17 @@ def ensure_environment(env_name: str = "conda-env") -> None:
             print(f"Switching to local environment: {env_name}...")
             os.execv(target_python, [target_python, __file__] + sys.argv[1:])
 
+
 ensure_environment("conda-env")
 
 # ===== Initialization ========================================================
 
-import gradio as gr
-from modules.customizer import root_agent
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
+import gradio as gr  # noqa: E402  (imports follow ensure_environment re-exec)
+from google.adk.runners import Runner  # noqa: E402
+from google.adk.sessions import InMemorySessionService  # noqa: E402
+from google.genai import types  # noqa: E402
 
+from modules.customizer import root_agent  # noqa: E402
 
 # ===== Session Logic =========================================================
 
@@ -50,16 +53,15 @@ runner = Runner(agent=root_agent, app_name="default", session_service=session_se
 
 
 async def process_message(
-    user_input: str, 
-    current_session_id: Optional[str]
-) -> AsyncGenerator[Tuple[str, str], None]:
+    user_input: str, current_session_id: str | None
+) -> AsyncGenerator[tuple[str, str], None]:
     """
     Async generator that handles the agent interaction.
-    
+
     Args:
         user_input: The text string from the user.
         current_session_id: The ID stored in gr.State.
-        
+
     Yields:
         Tuple[str, str]: (updated_response_text, updated_session_id)
     """
@@ -83,42 +85,43 @@ async def process_message(
 
     # --- Agent Query ---
     query = types.Content(role="user", parts=[types.Part(text=user_input)])
-    
+
     accumulated_response: str = ""
-    
+
     try:
         # Run the agent with streaming
         async for event in runner.run_async(
-            user_id=USER_ID, 
-            session_id=current_session_id, 
-            new_message=query
+            user_id=USER_ID, session_id=current_session_id, new_message=query
         ):
             if event.content and event.content.parts:
                 part_text = event.content.parts[0].text
                 if part_text and part_text != "None":
                     accumulated_response += part_text
                     yield accumulated_response, current_session_id
-                    
+
     except Exception as e:
         error_msg = f"Error: {str(e)}"
         print(error_msg)
         yield error_msg, current_session_id
 
+
 # ===== Other logic ===========================================================
+
 
 def save_api_key(api_key: str):
     if not api_key.strip():
         return "Error: Key cannot be empty."
-    
+
     try:
         os.makedirs("cache", exist_ok=True)
-        
+
         key_file = "cache/.api_key"
         with open(key_file, "w") as f:
             f.write(api_key.strip())
         return "API Key saved. You must restart the UI for this to take effect."
     except Exception as e:
         return f"Error saving key: {str(e)}"
+
 
 def run_extractor():
     script_path = os.path.join("helper-scripts", "ui", "item_id_extractor.py")
@@ -134,12 +137,13 @@ def run_extractor():
     except Exception as e:
         return f"Unexpected error: {str(e)}"
 
+
 def recipe_server_run():
     """
     Runs the Minecraft server, waits for the recipe dump trigger,
     stops the server, and runs the catcher script.
     """
-    server_dir = os.path.join(os.getcwd(), "server") 
+    server_dir = os.path.join(os.getcwd(), "server")
 
     jre_path = os.path.join(os.getcwd(), "jre", "bin", "java.exe")
 
@@ -149,14 +153,13 @@ def recipe_server_run():
     server_command = [jre_path, "-Xmx4G", "-jar", "server.jar", "nogui"]
 
     catcher_script = os.path.join("helper-scripts", "ui", "catch_recipe_dump.py")
-    
+
     trigger_prefix = "AGENTSYS_RECIPE_DUMP_END::"
     recipe_count = 0
     log_capture = []
 
     if not os.path.exists(catcher_script):
         return f"Error: Catcher script not found at {catcher_script}"
-
 
     try:
         log_capture.append("Starting server...")
@@ -167,30 +170,30 @@ def recipe_server_run():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1
+            bufsize=1,
         )
 
         found_trigger = False
 
         for line in server_process.stdout:
-            sys.stdout.write(line) 
-            
+            sys.stdout.write(line)
+
             if trigger_prefix in line:
                 found_trigger = True
                 try:
                     parts = line.strip().split("::")
                     if len(parts) > 1:
                         recipe_count = parts[1]
-                except:
+                except Exception:
                     recipe_count = "Unknown"
 
                 log_capture.append(f"Trigger detected! Recipes dumped: {recipe_count}")
                 log_capture.append("Sending 'stop' command...")
-                
+
                 server_process.stdin.write("/stop\n")
                 server_process.stdin.flush()
                 break
-        
+
         server_process.wait()
         log_capture.append("Server shutdown complete.")
 
@@ -201,16 +204,13 @@ def recipe_server_run():
         return f"Error running server: {str(e)}"
 
     try:
-        log_capture.append(f"Running catcher script...")
+        log_capture.append("Running catcher script...")
         catch_result = subprocess.run(
-            [sys.executable, catcher_script],
-            capture_output=True,
-            text=True,
-            check=True
+            [sys.executable, catcher_script], capture_output=True, text=True, check=True
         )
         log_capture.append("Catcher script finished successfully.")
         log_capture.append(f"Output: {catch_result.stdout}")
-        
+
     except subprocess.CalledProcessError as e:
         log_capture.append(f"Catcher script failed: {e.stderr}")
     except Exception as e:
@@ -218,55 +218,43 @@ def recipe_server_run():
 
     return "\n".join(log_capture)
 
+
 # ===== GUI ===================================================================
 
-def toggle_window(current_state: bool) -> Tuple[bool, dict]:
+
+def toggle_window(current_state: bool) -> tuple[bool, dict]:
     new_state = not current_state
     return new_state, gr.update(visible=new_state)
 
+
 with gr.Blocks() as demo:
     with gr.Accordion("Setup", open=False):
-            gr.Markdown("### Run each of these, then restart the UI before first use.")
-            gr.Markdown("Enter your Gemini API Key below if it is not already set.")
-            with gr.Row():
-                api_key_input = gr.Textbox(
-                    label="Gemini API Key", 
-                    type="password", 
-                    placeholder="key go here...",
-                    scale=4
-                )
-                save_key_btn = gr.Button("Save Key", scale=1)
-            
-            save_status = gr.Label(label="Status", show_label=False)
-
-            save_key_btn.click(
-                fn=save_api_key,
-                inputs=api_key_input,
-                outputs=save_status
+        gr.Markdown("### Run each of these, then restart the UI before first use.")
+        gr.Markdown("Enter your Gemini API Key below if it is not already set.")
+        with gr.Row():
+            api_key_input = gr.Textbox(
+                label="Gemini API Key", type="password", placeholder="key go here...", scale=4
             )
-            gr.Markdown("---")
-            with gr.Row():
-                gr.Markdown("Extract Item IDs for use in agent searches.")
-                extractor_btn = gr.Button("Run Item ID Extractor", scale=1)
-            extractor_status = gr.Textbox(label="Extractor Output", lines=1, interactive=False)
-            gr.Markdown("---")
-            with gr.Row():
-                gr.Markdown("Run Server, Dump Recipes, & Catch Results")
-                dump_btn = gr.Button("Run Recipe Dump Cycle", scale=1)
-            
-            dump_status = gr.Textbox(label="Dump Cycle Status", lines=6, interactive=False)
+            save_key_btn = gr.Button("Save Key", scale=1)
 
-            dump_btn.click(
-                fn=recipe_server_run,
-                inputs=None,
-                outputs=dump_status
-            )
+        save_status = gr.Label(label="Status", show_label=False)
 
-            extractor_btn.click(
-                fn=run_extractor,
-                inputs=None,
-                outputs=extractor_status
-            )
+        save_key_btn.click(fn=save_api_key, inputs=api_key_input, outputs=save_status)
+        gr.Markdown("---")
+        with gr.Row():
+            gr.Markdown("Extract Item IDs for use in agent searches.")
+            extractor_btn = gr.Button("Run Item ID Extractor", scale=1)
+        extractor_status = gr.Textbox(label="Extractor Output", lines=1, interactive=False)
+        gr.Markdown("---")
+        with gr.Row():
+            gr.Markdown("Run Server, Dump Recipes, & Catch Results")
+            dump_btn = gr.Button("Run Recipe Dump Cycle", scale=1)
+
+        dump_status = gr.Textbox(label="Dump Cycle Status", lines=6, interactive=False)
+
+        dump_btn.click(fn=recipe_server_run, inputs=None, outputs=dump_status)
+
+        extractor_btn.click(fn=run_extractor, inputs=None, outputs=extractor_status)
 
     session_state = gr.State(value=None)
     window_state = gr.State(False)
@@ -275,40 +263,33 @@ with gr.Blocks() as demo:
     with gr.Row(visible=False) as modifier_window:
         with gr.Column():
             gr.Markdown("### Recipe Modifier")
-            
+
             user_input = gr.Textbox(
                 label="Your message",
                 placeholder="Enter instructions for the recipe agent...",
-                lines=1
+                lines=1,
             )
-            
+
             submit_btn = gr.Button("Submit")
-            
-            output = gr.Textbox(
-                label="Response",
-                lines=10,
-                interactive=False,
-                autoscroll=True
-            )
-            
+
+            output = gr.Textbox(label="Response", lines=10, interactive=False, autoscroll=True)
+
             # Button click handler
             submit_btn.click(
                 fn=process_message,
-                inputs=[user_input, session_state], # Pass input and current session ID
-                outputs=[output, session_state]     # Update output and save session ID
+                inputs=[user_input, session_state],  # Pass input and current session ID
+                outputs=[output, session_state],  # Update output and save session ID
             )
-            
+
             # Enter key handler
             user_input.submit(
                 fn=process_message,
                 inputs=[user_input, session_state],
-                outputs=[output, session_state]
+                outputs=[output, session_state],
             )
 
     modifier_btn.click(
-        fn=toggle_window,
-        inputs=window_state,
-        outputs=[window_state, modifier_window]
+        fn=toggle_window, inputs=window_state, outputs=[window_state, modifier_window]
     )
 
 if __name__ == "__main__":
