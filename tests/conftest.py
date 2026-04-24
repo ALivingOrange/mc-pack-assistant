@@ -1,8 +1,8 @@
 """Pre-import test fixtures.
 
-The agent module (`modules.customizer.grounded_recipe_modifier_agent`) has
-heavy side effects at import time: it reads a cached API key from disk,
-loads item IDs and recipe JSON, and constructs a sentence-transformer model.
+The customizer package (`modules.customizer.agents`) has heavy side
+effects at import time: it reads a cached API key from disk, loads item
+IDs and recipe JSON, and constructs a sentence-transformer model.
 For unit tests we don't want any of that, so this conftest runs *before*
 tests import project code and:
 

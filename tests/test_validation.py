@@ -7,7 +7,7 @@ import pytest
 # Importing the customizer package triggers __init__.py, which loads the
 # agent module (google-adk / google-genai). Skip if unavailable.
 pytest.importorskip(
-    "modules.customizer.grounded_recipe_modifier_agent",
+    "modules.customizer.agents",
     reason="customizer package requires google-adk / google-genai to be installed",
 )
 
