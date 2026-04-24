@@ -4,16 +4,15 @@ import logging
 import os
 from pathlib import Path
 
-import numpy as np
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from sentence_transformers import SentenceTransformer
 
 from .config import MODEL_NAME, OUTPUT_PATH, retry_config
-from .data import ALL_RECIPES, VALID_ITEM_IDS
+from .data import ALL_RECIPES
+from .rag import ITEM_SEARCHER
 from .validation import validate_item_id, validate_shaped_recipe
 
 logger = logging.getLogger(__name__)
@@ -702,68 +701,6 @@ recipe_modifier_agent = LlmAgent(
 root_agent = SequentialAgent(
     name="RecipeModifierPipeline", sub_agents=[searcher_agent, recipe_modifier_agent]
 )
-
-# ====== RAG SETUP ============================================================
-
-
-class ItemIDSearcher:
-    """Semantic search for Minecraft item IDs using embeddings."""
-
-    def __init__(self, item_ids: list[str], model_name: str = "all-MiniLM-L6-v2"):
-        """
-        Initialize the searcher with item IDs.
-
-        Args:
-            item_ids: List of valid item IDs
-            model_name: Name of the sentence-transformer model to use
-        """
-        logger.info("Loading embedding model for item search...")
-        self.model = SentenceTransformer(model_name)
-        self.item_ids = list(item_ids)
-
-        # Precompute embeddings for all item IDs
-        # Transform IDs to be more human-readable for embedding
-        self.item_texts = [self._format_item_for_embedding(item_id) for item_id in self.item_ids]
-
-        logger.info("Computing embeddings for %d items...", len(self.item_ids))
-        self.embeddings = self.model.encode(self.item_texts, show_progress_bar=True)
-        logger.info("Item search ready!")
-
-    def _format_item_for_embedding(self, item_id: str) -> str:
-        """
-        Convert item ID to more semantic text for better embedding.
-
-        Example: 'minecraft:diamond_sword' -> 'minecraft diamond sword'
-        """
-        formatted = item_id.replace(":", " ").replace("_", " ")
-        return formatted
-
-    def search(self, query: str, top_k: int = 10) -> list[tuple[str, float]]:
-        """
-        Search for item IDs relevant to the query.
-
-        Args:
-            query: Natural language search query
-            top_k: Number of results to return
-
-        Returns:
-            List of (item_id, similarity_score) tuples, sorted by relevance
-        """
-        query_embedding = self.model.encode([query])[0]
-
-        # Compute cosine similarities
-        similarities = np.dot(self.embeddings, query_embedding) / (
-            np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_embedding)
-        )
-
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-
-        results = [(self.item_ids[idx], float(similarities[idx])) for idx in top_indices]
-        return results
-
-
-logger.info("Initializing item ID semantic search...")
-ITEM_SEARCHER = ItemIDSearcher(list(VALID_ITEM_IDS))
 
 # ====== TEST SCRIPT ==========================================================
 
