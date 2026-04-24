@@ -13,6 +13,7 @@ from google.genai import types
 from .config import MODEL_NAME, OUTPUT_PATH, retry_config
 from .data import ALL_RECIPES
 from .rag import ITEM_SEARCHER
+from .script_writer import append_to_script
 from .validation import validate_item_id, validate_shaped_recipe
 
 logger = logging.getLogger(__name__)
@@ -187,50 +188,32 @@ def add_shapeless_recipe(comment: str, ingredients: dict, result: str, count: in
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
-
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-        # Add script to lines
-    lines.append(f"\n\n// {comment}\n")
-    lines.append("event.shapeless(\n")
-    lines.append(f"\tItem.of('{result}', {count}),\n")
-    lines.append("\t[\n")
-    for key in ingredients:
-        # Check if there are multiple ingredient options
+    block = [
+        f"\n\n// {comment}\n",
+        "event.shapeless(\n",
+        f"\tItem.of('{result}', {count}),\n",
+        "\t[\n",
+    ]
+    ing_lines: list[str] = []
+    for key, amount in ingredients.items():
         if "|" in key:
-            ingredient_options = key.split("|")
-            formatted_options = ", ".join(f"'{opt}'" for opt in ingredient_options)
-            if ingredients[key] == 1:
-                lines.append(f"\t\t[{formatted_options}],\n")
+            options = ", ".join(f"'{opt}'" for opt in key.split("|"))
+            if amount == 1:
+                ing_lines.append(f"\t\t[{options}],\n")
             else:
-                lines.append(f"\t\t'{ingredients[key]}x [{formatted_options}]',\n")
+                ing_lines.append(f"\t\t'{amount}x [{options}]',\n")
         else:
-            if ingredients[key] == 1:
-                lines.append(f"\t\t'{key}',\n")
+            if amount == 1:
+                ing_lines.append(f"\t\t'{key}',\n")
             else:
-                lines.append(f"\t\t'{ingredients[key]}x {key}',\n")
-    # Remove comma from last ingredient
-    lines[-1] = lines[-1][:-2] + "\n"
+                ing_lines.append(f"\t\t'{amount}x {key}',\n")
+    if ing_lines:
+        ing_lines[-1] = ing_lines[-1][:-2] + "\n"
+    block.extend(ing_lines)
+    block.append("\t]\n")
+    block.append(")\n")
 
-    lines.append("\t]\n")
-    lines.append(")\n")
-    lines.append("})")
-
-    # Write back to output file
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def add_shaped_recipe(
@@ -269,55 +252,33 @@ def add_shaped_recipe(
     if not validation["valid"]:
         return {"status": "error", "error_message": validation["error_message"]}
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    block = [
+        f"\n\n// {comment}\n",
+        "event.shaped(\n",
+        f"\tItem.of('{result}', {count}),\n",
+        "\t[\n",
+    ]
+    shape_lines = [f"\t\t'{row}',\n" for row in shape]
+    if shape_lines:
+        shape_lines[-1] = shape_lines[-1][:-2] + "\n"
+    block.extend(shape_lines)
+    block.append("\t],\n")
+    block.append("\t{\n")
 
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-    # Add script to lines
-    lines.append(f"\n\n// {comment}\n")
-    lines.append("event.shaped(\n")
-    lines.append(f"\tItem.of('{result}', {count}),\n")
-    lines.append("\t[\n")
-
-    # Add shape pattern
-    for row in shape:
-        lines.append(f"\t\t'{row}',\n")
-    # Remove comma from last row
-    lines[-1] = lines[-1][:-2] + "\n"
-
-    lines.append("\t],\n")
-    lines.append("\t{\n")
-
-    # Add ingredient mappings
+    ing_lines: list[str] = []
     for key, letter in ingredients.items():
-        # Check if there are multiple ingredient options
         if "|" in key:
-            ingredient_options = key.split("|")
-            formatted_options = ", ".join(f"'{opt}'" for opt in ingredient_options)
-            lines.append(f"\t\t{letter}: [{formatted_options}],\n")
+            options = ", ".join(f"'{opt}'" for opt in key.split("|"))
+            ing_lines.append(f"\t\t{letter}: [{options}],\n")
         else:
-            lines.append(f"\t\t{letter}: '{key}',\n")
+            ing_lines.append(f"\t\t{letter}: '{key}',\n")
+    if ing_lines:
+        ing_lines[-1] = ing_lines[-1][:-2] + "\n"
+    block.extend(ing_lines)
+    block.append("\t}\n")
+    block.append(")\n")
 
-    # Remove comma from last ingredient
-    lines[-1] = lines[-1][:-2] + "\n"
-
-    lines.append("\t}\n")
-    lines.append(")\n")
-    lines.append("})")
-
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def add_smithing_recipe(comment: str, template: str, base: str, addition: str, result: str) -> dict:
@@ -345,33 +306,17 @@ def add_smithing_recipe(comment: str, template: str, base: str, addition: str, r
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    block = [
+        f"\n\n// {comment}\n",
+        "event.smithing(\n",
+        f"\t'{result}',\n",
+        f"\t'{template}',\n",
+        f"\t'{base}',\n",
+        f"\t'{addition}'\n",
+        ")\n",
+    ]
 
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-    # Add script to lines
-    lines.append(f"\n\n// {comment}\n")
-    lines.append("event.smithing(\n")
-    lines.append(f"\t'{result}',\n")
-    lines.append(f"\t'{template}',\n")
-    lines.append(f"\t'{base}',\n")
-    lines.append(f"\t'{addition}'\n")
-    lines.append(")\n")
-    lines.append("})")
-
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def add_cooking_recipe(
@@ -426,17 +371,6 @@ def add_cooking_recipe(
                 "error_message": f"Invalid method '{method}'. Must be one of: {valid_methods}",
             }
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
-
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-    # Map method names to KubeJS function names
     method_map = {
         "smelt": "smelting",
         "blast": "blasting",
@@ -444,39 +378,26 @@ def add_cooking_recipe(
         "fire": "campfireCooking",
     }
 
-    lines.append(f"\n\n// {comment}\n")
-    # Add script to lines for each method
-    for method in methods:
-        if "|" in ingredient:
-            ingredient_options = ingredient.split("|")
-            formatted_options = ", ".join(f"'{opt}'" for opt in ingredient_options)
-            ingredient_str = f"[{formatted_options}]"
-        else:
-            ingredient_str = f"'{ingredient}'"
+    if "|" in ingredient:
+        options = ", ".join(f"'{opt}'" for opt in ingredient.split("|"))
+        ingredient_str = f"[{options}]"
+    else:
+        ingredient_str = f"'{ingredient}'"
 
-        # Calculate time factor based on method
+    block: list[str] = [f"\n\n// {comment}\n"]
+    for method in methods:
         time_factor = 1.0
-        if method in ["blast", "smoke"]:
+        if method in ("blast", "smoke"):
             time_factor = 0.5
         elif method == "fire":
             time_factor = 3.0
 
-        # Use method chaining approach
-        lines.append(f"event.{method_map[method]}('{result}', {ingredient_str})")
+        block.append(f"event.{method_map[method]}('{result}', {ingredient_str})")
+        block.append(f".xp({xp})")
+        block.append(f".cookingTime({int(cooking_time * time_factor)})")
+        block.append("\n")
 
-        lines.append(f".xp({xp})")
-        lines.append(f".cookingTime({int(cooking_time * time_factor)})")
-        lines.append("\n")
-
-    lines.append("})")
-
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int) -> dict:
@@ -500,34 +421,14 @@ def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: i
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    result_str = f"'{count}x {result}'" if count > 1 else f"'{result}'"
 
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
+    block = [
+        f"\n\n// {comment}\n",
+        f"event.stonecutting({result_str}, '{ingredient}')\n",
+    ]
 
-    # Format result with count
-    if count > 1:
-        result_str = f"'{count}x {result}'"
-    else:
-        result_str = f"'{result}'"
-
-    # Add script to lines
-    lines.append(f"\n\n// {comment}\n")
-    lines.append(f"event.stonecutting({result_str}, '{ingredient}')\n")
-    lines.append("})")
-
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def remove_recipes(comment: str, filters: dict) -> dict:
@@ -560,30 +461,12 @@ def remove_recipes(comment: str, filters: dict) -> dict:
                 "error_message": f"Invalid input item ID: {filters['input']}",
             }
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
+    block = [
+        f"\n\n// {comment}\n",
+        f"event.remove({json.dumps(filters)})\n",
+    ]
 
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-    # Convert filter dict to JSON string
-    filter_str = json.dumps(filters)
-
-    lines.append(f"\n\n// {comment}\n")
-    lines.append(f"event.remove({filter_str})\n")
-    lines.append("})")
-
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 def replace_recipe_items(
@@ -614,37 +497,19 @@ def replace_recipe_items(
         if not validate_item_id(item_id):
             return {"status": "error", "error_message": f"Invalid item ID: {item_id}"}
 
-    try:
-        with open(OUTPUT_PATH) as file:
-            lines: list[str] = file.readlines()
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error reading file: " + str(e))}
-
-    # Remove last line (should be closing "})")
-    if lines:
-        lines = lines[:-1]
-
-    # Construct the KubeJS function name
     func_name = "replaceInput" if type == "input" else "replaceOutput"
-
-    # Convert filter dict to JSON string for JS compatibility
     filter_str = json.dumps(filter_criteria)
 
-    lines.append(f"\n\n// {comment}\n")
-    lines.append(f"event.{func_name}(\n")
-    lines.append(f"\t{filter_str},\n")  # Arg 1: Filter
-    lines.append(f"\t'{to_replace}',\n")  # Arg 2: Item to replace
-    lines.append(f"\t'{replace_with}'\n")  # Arg 3: Replacement
-    lines.append(")\n")
-    lines.append("})")
+    block = [
+        f"\n\n// {comment}\n",
+        f"event.{func_name}(\n",
+        f"\t{filter_str},\n",
+        f"\t'{to_replace}',\n",
+        f"\t'{replace_with}'\n",
+        ")\n",
+    ]
 
-    try:
-        with open(OUTPUT_PATH, "w") as file:
-            file.writelines(lines)
-    except OSError as e:
-        return {"status": "error", "error_message": ("Error writing file: " + str(e))}
-
-    return {"status": "success"}
+    return append_to_script(block)
 
 
 # ====== AGENTS ================================================
