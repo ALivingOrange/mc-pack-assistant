@@ -79,28 +79,21 @@ eula=true
 
 # Install Required Mods (through Modrinth API)
     Set-location mods
-    $mods = @(
+    # Load mod list from server-mods.toml using the conda env's Python (tomllib).
+    $modsToml = Join-Path $PSScriptRoot "server-mods.toml"
+    $modsJson = conda run -p $condaEnvPath python -c @"
+import json, tomllib
+with open(r'$modsToml', 'rb') as f:
+    data = tomllib.load(f)
+print(json.dumps(data['mod']))
+"@
+    $mods = $modsJson | ConvertFrom-Json | ForEach-Object {
         @{
-            ProjectId = "lhGA9TYQ"  # architectury-api
-            VersionId = "9.2.14+fabric"
-            OutFile = "architectury-9.2.14-fabric.jar"
-        },
-        @{
-            ProjectId = "sk9knFPE"  # rhino
-            VersionId = "2001.2.3-build.10+fabric"
-            OutFile = "rhino-fabric-2001.2.3-build.10.jar"
-        },
-        @{
-            ProjectId = "umyGl7zF"  # kubejs
-            VersionId = "2001.6.5-build.16+fabric"
-            OutFile = "kubejs-fabric-2001.6.5-build.16.jar"
-        },
-        @{
-            ProjectId = "P7dR8mSH"  # fabric-api
-            VersionId = "0.92.6+1.20.1"
-            OutFile = "fabric-api-0.92.6+1.20.1.jar"
+            ProjectId = $_.project_id
+            VersionId = $_.version
+            OutFile = $_.filename
         }
-    )
+    }
 
     foreach ($mod in $mods) {
         if (Test-Path $mod.OutFile) {

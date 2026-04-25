@@ -1,0 +1,25 @@
+# Mods installed by install.sh / install.ps1.
+# Each entry is fetched from the Modrinth API:
+#   project_id  — Modrinth project ID
+#   version     — exact version_number to match
+#   filename    — file to write into server/mods/
+
+[[mod]]
+project_id = "lhGA9TYQ"
+version = "9.2.14+fabric"
+filename = "architectury-9.2.14-fabric.jar"
+
+[[mod]]
+project_id = "sk9knFPE"
+version = "2001.2.3-build.10+fabric"
+filename = "rhino-fabric-2001.2.3-build.10.jar"
+
+[[mod]]
+project_id = "umyGl7zF"
+version = "2001.6.5-build.16+fabric"
+filename = "kubejs-fabric-2001.6.5-build.16.jar"
+
+[[mod]]
+project_id = "P7dR8mSH"
+version = "0.92.6+1.20.1"
+filename = "fabric-api-0.92.6+1.20.1.jar"

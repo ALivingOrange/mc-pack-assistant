@@ -86,13 +86,14 @@ EOF
         mkdir -p mods
         cd mods
 
-        # Mod array format: "ProjectId|VersionId|OutFile"
-        mods=(
-            "lhGA9TYQ|9.2.14+fabric|architectury-9.2.14-fabric.jar"
-            "sk9knFPE|2001.2.3-build.10+fabric|rhino-fabric-2001.2.3-build.10.jar"
-            "umyGl7zF|2001.6.5-build.16+fabric|kubejs-fabric-2001.6.5-build.16.jar"
-            "P7dR8mSH|0.92.6+1.20.1|fabric-api-0.92.6+1.20.1.jar"
-        )
+        # Mod array loaded from server-mods.toml; format: "ProjectId|VersionId|OutFile"
+        mapfile -t mods < <(conda run -p "$CONDA_ENV_PATH" python3 -c "
+import tomllib
+with open('$SCRIPT_DIR/server-mods.toml', 'rb') as f:
+    data = tomllib.load(f)
+for m in data['mod']:
+    print(f\"{m['project_id']}|{m['version']}|{m['filename']}\")
+")
 
         for mod_entry in "${mods[@]}"; do
             # Split the string by pipe delimiter
