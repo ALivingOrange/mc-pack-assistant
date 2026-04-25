@@ -16,7 +16,6 @@ def download_vanilla_registry(registry_type, version=None):
     """Download vanilla item or block registry from MCMeta repo."""
     CACHE_DIR.mkdir(exist_ok=True)
 
-    # Use version-specific URL if provided, otherwise use latest
     if version:
         url = f"https://raw.githubusercontent.com/misode/mcmeta/{version}-registries/{registry_type}/data.min.json"
         cache_file = CACHE_DIR / f"{registry_type}_{version}.json"
@@ -27,8 +26,7 @@ def download_vanilla_registry(registry_type, version=None):
     if cache_file.exists():
         logger.info("Using cached %s registry from %s", registry_type, cache_file)
         with open(cache_file, encoding="utf-8") as f:
-            data = json.load(f)
-            return data
+            return json.load(f)
 
     logger.info("Downloading %s registry from MCMeta...", registry_type)
     try:
@@ -60,13 +58,11 @@ def get_vanilla_ids(version=None):
 
     block_data = download_vanilla_registry("block", version)
     if block_data:
-        # Handle both dict with "values" key and direct list
         blocks_list = (
             block_data.get("values", block_data) if isinstance(block_data, dict) else block_data
         )
         if isinstance(blocks_list, list):
             blocks_before = len(vanilla_ids)
-
             vanilla_ids.update(f"minecraft:{block}" for block in blocks_list)
             new_blocks = len(vanilla_ids) - blocks_before
             logger.info("Loaded %d vanilla blocks (%d unique)", len(blocks_list), new_blocks)
@@ -83,7 +79,6 @@ def extract_ids_from_jar(jar_path):
         with zipfile.ZipFile(jar_path, "r") as jar:
             file_list = jar.namelist()
 
-            # Find the mod ID from the assets directory
             mod_ids = set()
             for file in file_list:
                 if file.startswith("assets/") and "/" in file[7:]:
@@ -91,18 +86,17 @@ def extract_ids_from_jar(jar_path):
                     if len(parts) >= 2:
                         mod_ids.add(parts[1])
 
-            # For each mod ID, look for model files
             for mod_id in mod_ids:
                 item_path_prefix = f"assets/{mod_id}/models/item/"
                 for file in file_list:
                     if file.startswith(item_path_prefix) and file.endswith(".json"):
-                        item_name = file[len(item_path_prefix) : -5]  # Remove path and .json
+                        item_name = file[len(item_path_prefix) : -5]
                         items.add(f"{mod_id}:{item_name}")
 
                 block_path_prefix = f"assets/{mod_id}/models/block/"
                 for file in file_list:
                     if file.startswith(block_path_prefix) and file.endswith(".json"):
-                        block_name = file[len(block_path_prefix) : -5]  # Remove path and .json
+                        block_name = file[len(block_path_prefix) : -5]
                         blocks.add(f"{mod_id}:{block_name}")
 
     except Exception as e:
@@ -141,13 +135,12 @@ def scan_modpack_directory(modpack_path):
 def save_results(items, blocks, vanilla_ids, output_file="item_ids.txt"):
     """Save extracted IDs to a text file."""
     with open(output_file, "w", encoding="utf-8") as f:
-        # Collect all unique items and blocks from mods
         all_mod_ids = set()
 
-        for jar_name, item_set in items.items():
+        for _jar_name, item_set in items.items():
             all_mod_ids.update(item_set)
 
-        for jar_name, block_set in blocks.items():
+        for _jar_name, block_set in blocks.items():
             all_mod_ids.update(block_set)
 
         all_ids = sorted(all_mod_ids | vanilla_ids)
@@ -159,31 +152,24 @@ def save_results(items, blocks, vanilla_ids, output_file="item_ids.txt"):
     logger.info("  Unique mod items/blocks: %d", len(all_mod_ids))
     logger.info("  Unique vanilla items/blocks: %d", len(vanilla_ids))
     logger.info("  Total unique IDs (after deduplication): %d", len(all_ids))
+    return len(all_ids)
 
 
-def main():
+def extract_item_ids(version: str = "1.20.1", modpack_path: str | os.PathLike = "server") -> Path:
+    """Extract vanilla + modpack item/block IDs and write them to cache.
+
+    Returns the path to the written file. Raises FileNotFoundError if the
+    modpack directory does not exist.
+    """
     logger.info("Minecraft Modpack Item ID Extractor")
-    logger.info("=" * 60)
-
-    """
-    # Get Minecraft version from user for vanilla items
-    version = input("Enter Minecraft version (e.g., 1.20.1) or press Enter for latest: ").strip()
-    if not version:
-        version = None
-    """
-
-    # For now just assume version is 1.20.1
-    version = "1.20.1"
 
     logger.info("Fetching vanilla items and blocks...")
     vanilla_ids = get_vanilla_ids(version)
     logger.info("Total unique vanilla items/blocks: %d", len(vanilla_ids))
 
-    modpack_path = Path("server")
-
-    if not os.path.exists(modpack_path):
-        logger.error("Directory '%s' not found!", modpack_path)
-        return
+    modpack_path = Path(modpack_path)
+    if not modpack_path.exists():
+        raise FileNotFoundError(f"Directory '{modpack_path}' not found")
 
     logger.info("Scanning modpack...")
     items, blocks = scan_modpack_directory(modpack_path)
@@ -193,8 +179,9 @@ def main():
     save_results(items, blocks, vanilla_ids, output_file)
 
     logger.info("Done! Results saved to '%s'", output_file)
+    return output_file
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    main()
+    extract_item_ids()
