@@ -1,11 +1,9 @@
 import logging
-import os
-from pathlib import Path
 
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.models.google_llm import Gemini
 
-from .config import MODEL_NAME, OUTPUT_PATH, retry_config
+from .config import MODEL_NAME, OUTPUT_PATH, load_api_key, retry_config
 from .tools import (
     add_cooking_recipe,
     add_shaped_recipe,
@@ -21,18 +19,7 @@ from .tools import (
 logger = logging.getLogger(__name__)
 
 
-# Load API key: prefer existing env var, else fall back to cache file if present.
-if not os.environ.get("GOOGLE_API_KEY"):
-    _api_key_path = Path(__file__).parent.parent.parent / "cache" / ".api_key"
-    try:
-        with open(_api_key_path) as _file:
-            os.environ["GOOGLE_API_KEY"] = _file.read().strip()
-    except OSError:
-        logger.warning(
-            "GOOGLE_API_KEY not set and %s not readable; agent calls will fail until one is "
-            "provided.",
-            _api_key_path,
-        )
+load_api_key()
 
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 if not OUTPUT_PATH.exists():
