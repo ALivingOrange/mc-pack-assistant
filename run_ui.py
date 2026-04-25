@@ -50,6 +50,7 @@ from google.adk.sessions import InMemorySessionService  # noqa: E402
 from google.genai import types  # noqa: E402
 
 from modules.customizer import root_agent  # noqa: E402
+from modules.pipeline import extract_item_ids, extract_recipes_from_log  # noqa: E402
 
 # ===== Session Logic =========================================================
 
@@ -129,19 +130,13 @@ def save_api_key(api_key: str):
         return f"Error saving key: {str(e)}"
 
 
-def run_extractor():
-    script_path = os.path.join("helper-scripts", "ui", "item_id_extractor.py")
-
-    if not os.path.exists(script_path):
-        return f"Error: Could not find script at {script_path}"
-
+async def run_extractor():
     try:
-        subprocess.run([sys.executable, script_path], check=True)
-        return "Extractor script ran successfully!"
-    except subprocess.CalledProcessError as e:
-        return f"Error running script: {e}"
+        output_file = await asyncio.to_thread(extract_item_ids)
+        return f"Extractor finished. Wrote {output_file}."
     except Exception as e:
-        return f"Unexpected error: {str(e)}"
+        logger.exception("Extractor failed")
+        return f"Error running extractor: {e}"
 
 
 def _recipe_server_run_blocking():
@@ -159,14 +154,9 @@ def _recipe_server_run_blocking():
 
     server_command = [jre_path, "-Xmx4G", "-jar", "server.jar", "nogui"]
 
-    catcher_script = os.path.join("helper-scripts", "ui", "catch_recipe_dump.py")
-
     trigger_prefix = "AGENTSYS_RECIPE_DUMP_END::"
     recipe_count = 0
     log_capture = []
-
-    if not os.path.exists(catcher_script):
-        return f"Error: Catcher script not found at {catcher_script}"
 
     try:
         log_capture.append("Starting server...")
@@ -211,17 +201,13 @@ def _recipe_server_run_blocking():
         return f"Error running server: {str(e)}"
 
     try:
-        log_capture.append("Running catcher script...")
-        catch_result = subprocess.run(
-            [sys.executable, catcher_script], capture_output=True, text=True, check=True
-        )
-        log_capture.append("Catcher script finished successfully.")
-        log_capture.append(f"Output: {catch_result.stdout}")
-
-    except subprocess.CalledProcessError as e:
-        log_capture.append(f"Catcher script failed: {e.stderr}")
+        log_capture.append("Extracting recipes from server log...")
+        count = extract_recipes_from_log()
+        log_capture.append(f"Catcher finished. Extracted {count} recipes.")
+    except FileNotFoundError as e:
+        log_capture.append(f"Catcher failed: {e}")
     except Exception as e:
-        log_capture.append(f"Error running catcher: {str(e)}")
+        log_capture.append(f"Error running catcher: {e}")
 
     return "\n".join(log_capture)
 
