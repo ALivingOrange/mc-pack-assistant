@@ -1,5 +1,5 @@
-from ..script_writer import append_to_script
-from ..validation import validate_item_id
+from ...script_writer import append_to_script
+from ...validation import validate_item_id
 
 
 def add_stonecutting_recipe(comment: str, ingredient: str, result: str, count: int) -> dict:

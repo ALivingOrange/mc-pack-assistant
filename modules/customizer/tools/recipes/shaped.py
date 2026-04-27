@@ -1,5 +1,5 @@
-from ..script_writer import append_to_script
-from ..validation import validate_item_id, validate_shaped_recipe
+from ...script_writer import append_to_script
+from ...validation import validate_item_id, validate_shaped_recipe
 
 
 def add_shaped_recipe(
